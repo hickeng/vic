@@ -370,6 +370,11 @@ func decodeTime(src DataSource, dest reflect.Value, prefix string, depth recursi
 
 // fromString converts string representation of a basic type to basic type
 func fromString(field reflect.Value, value string) reflect.Value {
+	// handle the zero value
+	if value == "" {
+		return reflect.Zero(field.Type())
+	}
+
 	switch field.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		s, err := strconv.ParseInt(value, 10, 64)
