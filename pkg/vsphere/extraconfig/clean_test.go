@@ -47,9 +47,9 @@ func TestEmbedded(t *testing.T) {
 	Encode(MapSink(encoded), Embedded)
 
 	expected := map[string]string{
-		"guestinfo/common/id":    "0xDEADBEEF",
-		"guestinfo/common/name":  "Embedded",
-		"guestinfo/common/notes": "",
+		"guestinfo.common/id":    "0xDEADBEEF",
+		"guestinfo.common/name":  "Embedded",
+		"guestinfo.common/notes": "",
 	}
 	assert.Equal(t, expected, encoded, "Encoded and expected does not match")
 
@@ -74,8 +74,8 @@ func TestNetPointer(t *testing.T) {
 	Encode(MapSink(encoded), Net)
 
 	expected := map[string]string{
-		"guestinfo/net/IP":   base64.StdEncoding.EncodeToString(n.IP),
-		"guestinfo/net/Mask": base64.StdEncoding.EncodeToString(n.Mask),
+		"guestinfo.net/IP":   base64.StdEncoding.EncodeToString(n.IP),
+		"guestinfo.net/Mask": base64.StdEncoding.EncodeToString(n.Mask),
 	}
 	assert.Equal(t, expected, encoded, "Encoded and expected does not match")
 
@@ -100,7 +100,7 @@ func TestTimePointer(t *testing.T) {
 	Encode(MapSink(encoded), Time)
 
 	expected := map[string]string{
-		"guestinfo/time": "2009-11-10 23:00:00 +0000 UTC",
+		"guestinfo.time": "2009-11-10 23:00:00 +0000 UTC",
 	}
 	assert.Equal(t, expected, encoded, "Encoded and expected does not match")
 
@@ -136,16 +136,16 @@ func TestStructMap(t *testing.T) {
 	Encode(MapSink(encoded), StructMap)
 
 	expected := map[string]string{
-		"guestinfo/map|Key1/id":    "0xDEADBEEF",
-		"guestinfo/map|Key1/name":  "beef",
-		"guestinfo/map|Key1/notes": "",
-		"guestinfo/map|Key2/id":    "0x8BADF00D",
-		"guestinfo/map|Key2/name":  "food",
-		"guestinfo/map|Key2/notes": "",
-		"guestinfo/map|Key3/id":    "0xDEADF00D",
-		"guestinfo/map|Key3/name":  "dead",
-		"guestinfo/map|Key3/notes": "",
-		"guestinfo/map":            "Key1|Key2|Key3",
+		"guestinfo.map|Key1/id":    "0xDEADBEEF",
+		"guestinfo.map|Key1/name":  "beef",
+		"guestinfo.map|Key1/notes": "",
+		"guestinfo.map|Key2/id":    "0x8BADF00D",
+		"guestinfo.map|Key2/name":  "food",
+		"guestinfo.map|Key2/notes": "",
+		"guestinfo.map|Key3/id":    "0xDEADF00D",
+		"guestinfo.map|Key3/name":  "dead",
+		"guestinfo.map|Key3/notes": "",
+		"guestinfo.map":            "Key1|Key2|Key3",
 	}
 	assert.Equal(t, expected, encoded, "Encoded and expected does not match")
 
@@ -181,16 +181,16 @@ func TestIntStructMap(t *testing.T) {
 	Encode(MapSink(encoded), StructMap)
 
 	expected := map[string]string{
-		"guestinfo/map|1/id":    "0xDEADBEEF",
-		"guestinfo/map|1/name":  "beef",
-		"guestinfo/map|1/notes": "",
-		"guestinfo/map|2/id":    "0x8BADF00D",
-		"guestinfo/map|2/name":  "food",
-		"guestinfo/map|2/notes": "",
-		"guestinfo/map|3/id":    "0xDEADF00D",
-		"guestinfo/map|3/name":  "dead",
-		"guestinfo/map|3/notes": "",
-		"guestinfo/map":         "1|2|3",
+		"guestinfo.map|1/id":    "0xDEADBEEF",
+		"guestinfo.map|1/name":  "beef",
+		"guestinfo.map|1/notes": "",
+		"guestinfo.map|2/id":    "0x8BADF00D",
+		"guestinfo.map|2/name":  "food",
+		"guestinfo.map|2/notes": "",
+		"guestinfo.map|3/id":    "0xDEADF00D",
+		"guestinfo.map|3/name":  "dead",
+		"guestinfo.map|3/notes": "",
+		"guestinfo.map":         "1|2|3",
 	}
 	assert.Equal(t, expected, encoded, "Encoded and expected does not match")
 
@@ -222,13 +222,13 @@ func TestStructSlice(t *testing.T) {
 	Encode(MapSink(encoded), StructSlice)
 
 	expected := map[string]string{
-		"guestinfo/slice":         "1",
-		"guestinfo/slice|0/id":    "0xDEADFEED",
-		"guestinfo/slice|0/name":  "feed",
-		"guestinfo/slice|0/notes": "",
-		"guestinfo/slice|1/id":    "0xFACEFEED",
-		"guestinfo/slice|1/name":  "face",
-		"guestinfo/slice|1/notes": "",
+		"guestinfo.slice":         "1",
+		"guestinfo.slice|0/id":    "0xDEADFEED",
+		"guestinfo.slice|0/name":  "feed",
+		"guestinfo.slice|0/notes": "",
+		"guestinfo.slice|1/id":    "0xFACEFEED",
+		"guestinfo.slice|1/name":  "face",
+		"guestinfo.slice|1/notes": "",
 	}
 	assert.Equal(t, expected, encoded, "Encoded and expected does not match")
 
@@ -330,12 +330,12 @@ func TestComplex(t *testing.T) {
 	Encode(MapSink(encoded), ExecutorConfig)
 
 	expected := map[string]string{
-		"guestinfo/executorconfig/common/id":                      "",
-		"guestinfo/executorconfig/common/name":                    "",
-		"guestinfo/executorconfig/common/notes":                   "",
-		"guestinfo/executorconfig/sessions|Session1/common/id":    "SessionID",
-		"guestinfo/executorconfig/sessions|Session1/common/name":  "SessionName",
-		"guestinfo/executorconfig/sessions|Session1/common/notes": "",
+		"guestinfo.executorconfig/common/id":                      "",
+		"guestinfo.executorconfig/common/name":                    "",
+		"guestinfo.executorconfig/common/notes":                   "",
+		"guestinfo.executorconfig/sessions|Session1/common/id":    "SessionID",
+		"guestinfo.executorconfig/sessions|Session1/common/name":  "SessionName",
+		"guestinfo.executorconfig/sessions|Session1/common/notes": "",
 		"executorconfig/sessions|Session1/cmd/path":               "/vmware",
 		"executorconfig/sessions|Session1/cmd/args~":              "/bin/imagec|-standalone",
 		"executorconfig/sessions|Session1/cmd/args":               "1",
@@ -383,12 +383,12 @@ func TestComplexPointer(t *testing.T) {
 	Encode(MapSink(encoded), ExecutorConfig)
 
 	expected := map[string]string{
-		"guestinfo/executorconfig/common/id":                      "",
-		"guestinfo/executorconfig/common/name":                    "",
-		"guestinfo/executorconfig/common/notes":                   "",
-		"guestinfo/executorconfig/sessions|Session1/common/id":    "SessionID",
-		"guestinfo/executorconfig/sessions|Session1/common/name":  "SessionName",
-		"guestinfo/executorconfig/sessions|Session1/common/notes": "",
+		"guestinfo.executorconfig/common/id":                      "",
+		"guestinfo.executorconfig/common/name":                    "",
+		"guestinfo.executorconfig/common/notes":                   "",
+		"guestinfo.executorconfig/sessions|Session1/common/id":    "SessionID",
+		"guestinfo.executorconfig/sessions|Session1/common/name":  "SessionName",
+		"guestinfo.executorconfig/sessions|Session1/common/notes": "",
 		"executorconfig/sessions|Session1/cmd/path":               "/vmware",
 		"executorconfig/sessions|Session1/cmd/args~":              "/bin/imagec|-standalone",
 		"executorconfig/sessions|Session1/cmd/args":               "1",
@@ -432,12 +432,12 @@ func TestPointerDecode(t *testing.T) {
 	Encode(MapSink(encoded), reference)
 
 	expected := map[string]string{
-		"guestinfo/common/id":                      "",
-		"guestinfo/common/name":                    "",
-		"guestinfo/common/notes":                   "",
-		"guestinfo/sessions|Session1/common/id":    "SessionID",
-		"guestinfo/sessions|Session1/common/name":  "SessionName",
-		"guestinfo/sessions|Session1/common/notes": "",
+		"guestinfo.common/id":                      "",
+		"guestinfo.common/name":                    "",
+		"guestinfo.common/notes":                   "",
+		"guestinfo.sessions|Session1/common/id":    "SessionID",
+		"guestinfo.sessions|Session1/common/name":  "SessionName",
+		"guestinfo.sessions|Session1/common/notes": "",
 		"sessions|Session1/cmd/path":               "/vmware",
 		"sessions|Session1/cmd/args~":              "/bin/imagec|-standalone",
 		"sessions|Session1/cmd/args":               "1",
