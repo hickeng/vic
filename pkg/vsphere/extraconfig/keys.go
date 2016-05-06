@@ -213,18 +213,27 @@ func calculateKey(scopes []string, prefix string, key string) string {
 		}
 	}
 
+	// We need to use "guestinfo." as a prefix otherwise those values
+	// will NOT be accesible from the guest.
+	// That's why we replace "guestinfo/" with "guestinfo." below
+
 	// the add detail to the base
 	if guestinfo == "" && prefix == "" {
-		return key
+		return strings.Replace(key, DefaultGuestInfoPrefix+"/", DefaultGuestInfoPrefix+".", 1)
 	}
 
 	if guestinfo == "" {
-		return strings.Join([]string{base, key}, seperator)
+		r := strings.Join([]string{base, key}, seperator)
+		return strings.Replace(r, DefaultGuestInfoPrefix+"/", DefaultGuestInfoPrefix+".", 1)
+
 	}
 
 	if prefix == "" {
-		return strings.Join([]string{guestinfo, key}, seperator)
+		r := strings.Join([]string{guestinfo, key}, seperator)
+		return strings.Replace(r, DefaultGuestInfoPrefix+"/", DefaultGuestInfoPrefix+".", 1)
+
 	}
 
-	return strings.Join([]string{guestinfo, prefix, key}, seperator)
+	r := strings.Join([]string{guestinfo, prefix, key}, seperator)
+	return strings.Replace(r, DefaultGuestInfoPrefix+"/", DefaultGuestInfoPrefix+".", 1)
 }
