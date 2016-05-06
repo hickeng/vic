@@ -155,6 +155,7 @@ func run(src extraconfig.DataSource, sink extraconfig.DataSink) error {
 			// check if session has never been started
 			if proc == nil {
 				log.Infof("Launching process for session %s\n", session.ID)
+				log.Infof("Launching process for session %#v\n", session.Cmd)
 				err := launch(session)
 				if err != nil {
 					detail := fmt.Sprintf("failed to launch %s for %s: %s", session.Cmd.Path, id, err)

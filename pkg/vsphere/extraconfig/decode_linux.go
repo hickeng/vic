@@ -17,6 +17,8 @@ package extraconfig
 import (
 	"errors"
 
+	log "github.com/Sirupsen/logrus"
+
 	"github.com/vmware/vmw-guestinfo/rpcvmx"
 	"github.com/vmware/vmw-guestinfo/vmcheck"
 )
@@ -30,14 +32,14 @@ func GuestInfoSource() (DataSource, error) {
 		return nil, errors.New("not in a virtual world")
 	}
 
-	// prefix is "guestinfo." or "guestinfo/"
-	prefixLen := len("guestinfo.")
-
 	return func(key string) (string, error) {
-		value, err := guestinfo.String(key[prefixLen:], "")
+		log.Debugf("GuestInfoSource: Retrieving %#v", key)
+		value, err := guestinfo.String(key, "")
 		if value == "<nil>" {
 			value = ""
 		}
+		log.Debugf("GuestInfoSource: Returning value %#v error %#v", value, err)
+
 		return value, err
 	}, nil
 }

@@ -17,6 +17,8 @@ package extraconfig
 import (
 	"errors"
 
+	log "github.com/Sirupsen/logrus"
+
 	"github.com/vmware/vmw-guestinfo/rpcvmx"
 	"github.com/vmware/vmw-guestinfo/vmcheck"
 )
@@ -30,13 +32,14 @@ func GuestInfoSink() (DataSink, error) {
 		return nil, errors.New("not in a virtual world")
 	}
 
-	// prefix is "guestinfo." or "guestinfo/"
-	prefixLen := len("guestinfo.")
-
 	return func(key, value string) error {
+		log.Debugf("GuestInfoSink: Setting %#v with %#v", key, value)
+
 		if value == "" {
 			value = "<nil>"
 		}
-		return guestinfo.SetString(key[prefixLen:], value)
+		err := guestinfo.SetString(key, value)
+		log.Debugf("GuestInfoSink: Returning %#v", err)
+		return err
 	}, nil
 }
