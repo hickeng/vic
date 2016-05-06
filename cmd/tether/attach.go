@@ -159,6 +159,41 @@ func (t *attachServerSSH) run() error {
 		}
 		t.conn = &conn
 
+		if log.GetLevel() == log.DebugLevel {
+			// to aid in debugging line noisy/drop outs
+			ref := make([]byte, 256)
+
+			for i := range ref {
+				ref[i] = uint8(i)
+			}
+
+			// expect 256 bytes in numeric order
+			debug := make([]byte, 256)
+			dn, err := conn.Read(debug)
+			if dn != 256 || err != nil {
+				log.Debugf("line read debug failed - %d bytes: %#v", dn, debug[:dn])
+			}
+
+			// write back
+			rn, err := conn.Write(ref)
+			if rn != 256 || err != nil {
+				log.Debugf("line write debug failed - %d bytes: %#v", rn, ref[:rn])
+			}
+
+			for i := range ref {
+				if i >= dn {
+					log.Debugf("short read back - exiting compare at %d", dn)
+					break
+				}
+
+				if ref[i] != debug[i] {
+					log.Debugf("read back does not match expected: %#v", debug)
+				}
+			}
+
+			log.Debugf("line read/write debug completed for 256 bytes")
+		}
+
 		// create the SSH server
 		sConn, chans, reqs, err = ssh.NewServerConn(*t.conn, t.config)
 		if err != nil {

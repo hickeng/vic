@@ -165,6 +165,41 @@ func (c *Connector) processIncoming(conn net.Conn) {
 		}
 	}
 
+	if log.GetLevel() == log.DebugLevel {
+		// to aid in debugging line noisy/drop outs
+		debug := make([]byte, 256)
+		ref := make([]byte, 256)
+
+		for i := range ref {
+			ref[i] = uint8(i)
+		}
+
+		// write byte sequence
+		rn, err := conn.Write(ref)
+		if rn != 256 || err != nil {
+			log.Debugf("line write debug failed - %d bytes: %#v", rn, ref[:rn])
+		}
+
+		// expect 256 bytes in numeric order
+		dn, err := conn.Read(debug)
+		if dn != 256 || err != nil {
+			log.Debugf("line read debug failed - %d bytes: %#v", dn, debug[:dn])
+		}
+
+		for i := range ref {
+			if i >= dn {
+				log.Debugf("short read back - exiting compare at %d", i)
+				break
+			}
+
+			if ref[i] != debug[i] {
+				log.Debugf("read back does not match expected: %#v", debug)
+			}
+		}
+
+		log.Debugf("line read/write debug successfully completed for 256 bytes")
+	}
+
 	callback := func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 		return nil
 	}
