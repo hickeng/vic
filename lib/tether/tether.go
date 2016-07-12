@@ -187,6 +187,7 @@ func (t *tether) Start() error {
 		extraconfig.Encode(t.sink, t.config)
 
 		//process the filesystem mounts - this is performed after networks to allow for network mounts
+		log.Infof("Process %d mount entries", len(t.config.Mounts))
 		for k, v := range t.config.Mounts {
 			if v.Source.Scheme != "label" {
 				detail := fmt.Sprintf("unsupported volume mount type for %s: %s", k, v.Source.Scheme)
@@ -195,7 +196,11 @@ func (t *tether) Start() error {
 			}
 
 			// this could block indefinitely while waiting for a volume to present
-			t.ops.MountLabel(v.Source.Path, v.Path, context.Background())
+			err := t.ops.MountLabel(v.Source.Path, v.Path, context.Background())
+			if err != nil {
+				log.Errorf("failed to mount %s: %s", k, err)
+				return err
+			}
 		}
 
 		// process the sessions and launch if needed
