@@ -16,15 +16,23 @@ package simulator
 
 import (
 	"context"
+	"crypto/sha1"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -263,6 +271,85 @@ func TestServeHTTP(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
+	}
+}
+
+func fingerprint(cert []byte) string {
+	sum := sha1.Sum(cert)
+	hex := make([]string, len(sum))
+	for i, b := range sum {
+		hex[i] = fmt.Sprintf("%02X", b)
+	}
+	return strings.Join(hex, ":")
+}
+
+func TestServeHTTPS(t *testing.T) {
+	s := New(NewServiceInstance(esx.ServiceContent, esx.RootFolder))
+	s.TLS = new(tls.Config)
+	ts := s.NewServer()
+	defer ts.Close()
+
+	ctx := context.Background()
+	// insecure=true OK
+	client, err := govmomi.NewClient(ctx, ts.URL, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = client.Login(ctx, ts.URL.User)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// insecure=false should FAIL
+	_, err = govmomi.NewClient(ctx, ts.URL, false)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	uerr, ok := err.(*url.Error)
+	if !ok {
+		t.Fatalf("err type=%T", err)
+	}
+
+	_, ok = uerr.Err.(x509.UnknownAuthorityError)
+	if !ok {
+		t.Fatalf("err type=%T", uerr.Err)
+	}
+
+	cert := ts.Certificate()
+
+	sinfo := new(object.HostCertificateInfo).FromCertificate(cert)
+
+	// Test custom verify
+	sc := soap.NewClient(ts.URL, false)
+	sc.SetDialTLS(func(err error, state tls.ConnectionState) error {
+		pinfo := new(object.HostCertificateInfo).FromCertificate(state.PeerCertificates[0])
+		// peer thumbprint should match our server thumbprint
+		if pinfo.ThumbprintSHA1 != sinfo.ThumbprintSHA1 {
+			return err
+		}
+		return nil
+	})
+
+	_, err = vim25.NewClient(ctx, sc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test custom RootCAs list
+	sc = soap.NewClient(ts.URL, false)
+	caFile, err := ts.CertificateFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = sc.SetRootCAs(caFile); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = vim25.NewClient(ctx, sc)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
