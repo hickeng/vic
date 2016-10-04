@@ -100,6 +100,10 @@ func CreateNoDCCheck(ctx context.Context, input *data.Data) (*Validator, error) 
 		Insecure: input.Insecure,
 	}
 
+	if input.Thumbprint != nil {
+		sessionconfig.Thumbprint = *input.Thumbprint
+	}
+
 	// if a datacenter was specified, set it
 	v.DatacenterPath = tURL.Path
 	if v.DatacenterPath != "" {
@@ -310,6 +314,9 @@ func (v *Validator) target(ctx context.Context, input *data.Data, conf *config.V
 
 	conf.Target = *targetURL
 	conf.Insecure = input.Insecure
+	if input.Thumbprint != nil {
+		conf.TargetThumbprint = *input.Thumbprint
+	}
 
 	// TODO: more checks needed here if specifying service account for VCH
 }

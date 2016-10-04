@@ -73,7 +73,6 @@ func (d *Uninstall) processParams() error {
 		return err
 	}
 
-	d.Insecure = true
 	return nil
 }
 

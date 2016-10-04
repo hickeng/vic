@@ -66,6 +66,7 @@ func (i *InteractionHandlersImpl) Configure(api *operations.PortLayerAPI, _ *Han
 	sessionconfig := &session.Config{
 		Service:        options.PortLayerOptions.SDK,
 		Insecure:       options.PortLayerOptions.Insecure,
+		Thumbprint:     options.PortLayerOptions.Thumbprint,
 		Keepalive:      options.PortLayerOptions.Keepalive,
 		DatacenterPath: options.PortLayerOptions.DatacenterPath,
 		ClusterPath:    options.PortLayerOptions.ClusterPath,

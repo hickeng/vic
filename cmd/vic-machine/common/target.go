@@ -30,8 +30,10 @@ import (
 type Target struct {
 	URL *url.URL
 
-	User     string
-	Password *string
+	User       string
+	Password   *string
+	Insecure   bool
+	Thumbprint *string
 }
 
 func NewTarget() *Target {
@@ -55,6 +57,16 @@ func (t *Target) TargetFlags() []cli.Flag {
 			Name:  "password, p",
 			Value: flags.NewOptionalString(&t.Password),
 			Usage: "ESX or vCenter password",
+		},
+		cli.BoolTFlag{ // TODO: s/BoolTFlag/BoolFlag/ - should be false by default
+			Name:        "insecure",
+			Destination: &t.Insecure,
+			Usage:       "Skip verification of ESX or vCenter host certificate",
+		},
+		cli.GenericFlag{
+			Name:  "thumbprint",
+			Value: flags.NewOptionalString(&t.Thumbprint),
+			Usage: "ESX or vCenter host certificate thumbprint",
 		},
 	}
 }

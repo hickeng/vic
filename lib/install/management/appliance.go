@@ -466,8 +466,8 @@ func (d *Dispatcher) createAppliance(conf *config.VirtualContainerHostConfigSpec
 			Args: []string{
 				"/sbin/vicadmin",
 				"-docker-host=unix:///var/run/docker.sock",
-				// FIXME: hack during config migration
-				"-insecure",
+				fmt.Sprintf("-insecure=%t", conf.Insecure),
+				"-thumbprint=" + conf.TargetThumbprint,
 				"-ds=" + conf.ImageStores[0].Host,
 				"-cluster=" + settings.ClusterPath,
 				"-pool=" + settings.ResourcePoolPath,
@@ -511,21 +511,28 @@ func (d *Dispatcher) createAppliance(conf *config.VirtualContainerHostConfigSpec
 	},
 	)
 
+	args := []string{
+		"/sbin/port-layer-server",
+		//FIXME: hack during config migration
+		"--host=localhost",
+		fmt.Sprintf("--port=%d", portLayerPort),
+		"--sdk=" + conf.Target.String(),
+		"--thumbprint=" + conf.TargetThumbprint,
+		"--datacenter=" + settings.DatacenterName,
+		"--cluster=" + settings.ClusterPath,
+		"--pool=" + settings.ResourcePoolPath,
+		"--datastore=" + conf.ImageStores[0].Host,
+	}
+
+	if conf.Insecure {
+		// jessevdk/go-flags doesn't support bool flags with arguments
+		args = append(args, "--insecure")
+	}
+
 	conf.AddComponent("port-layer", &executor.SessionConfig{
 		Cmd: executor.Cmd{
 			Path: "/sbin/port-layer-server",
-			Args: []string{
-				"/sbin/port-layer-server",
-				//FIXME: hack during config migration
-				"--host=localhost",
-				fmt.Sprintf("--port=%d", portLayerPort),
-				"--insecure",
-				"--sdk=" + conf.Target.String(),
-				"--datacenter=" + settings.DatacenterName,
-				"--cluster=" + settings.ClusterPath,
-				"--pool=" + settings.ResourcePoolPath,
-				"--datastore=" + conf.ImageStores[0].Host,
-			},
+			Args: args,
 		},
 		Restart: true,
 	},

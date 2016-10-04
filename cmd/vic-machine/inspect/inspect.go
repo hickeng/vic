@@ -58,7 +58,6 @@ func (i *Inspect) processParams() error {
 		return err
 	}
 
-	i.Insecure = true
 	return nil
 }
 

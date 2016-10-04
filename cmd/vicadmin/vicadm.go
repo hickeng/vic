@@ -119,6 +119,7 @@ func init() {
 	flag.StringVar(&config.ClusterPath, "cluster", "", "Path of the cluster")
 	flag.StringVar(&config.PoolPath, "pool", "", "Path of the resource pool")
 	flag.BoolVar(&config.Insecure, "insecure", false, "Allow connection when sdk certificate cannot be verified")
+	flag.StringVar(&config.Thumbprint, "thumbprint", "", "SDK host certificate thumbprint")
 	flag.BoolVar(&config.tls, "tls", true, "Set to false to disable -hostcert and -hostkey and enable plain HTTP")
 
 	// This is only applicable for containers hosted under the VCH VM folder
