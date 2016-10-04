@@ -108,7 +108,7 @@ func (d *Uninstall) Run(cli *cli.Context) (err error) {
 		log.Errorf("Delete cannot continue - failed to create validator: %s", err)
 		return errors.New("delete failed")
 	}
-	executor := management.NewDispatcher(validator.Context, validator.Session, nil, d.Force)
+	executor := management.NewDispatcher(validator.Context, validator.Session, nil, nil, d.Force)
 
 	var vch *vm.VirtualMachine
 	if d.Data.ID != "" {

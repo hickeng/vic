@@ -86,9 +86,6 @@ type VirtualContainerHostConfigSpec struct {
 	CertificateAuthorities []byte `vic:"0.1" scope:"read-only"`
 	// Certificates for specific system access, keyed by FQDN
 	HostCertificates map[string]*RawCertificate
-	// Used for authentication against e.g. the Docker HTTP endpoint
-	UserKeyPEM  string `vic:"0.1" scope:"read-only" key:"key_pem"`
-	UserCertPEM string `vic:"0.1" scope:"read-only" key:"cert_pem"`
 
 	////////////// Port Layer - storage
 	// Datastore URLs for image stores - the top layer is [0], the bottom layer is [len-1]
