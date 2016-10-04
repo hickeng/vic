@@ -69,10 +69,13 @@ cp ${DIR}/appliance/vic.target $(rootfs_dir $PKGDIR)/etc/systemd/system/
 cp ${DIR}/appliance/vic-init.service $(rootfs_dir $PKGDIR)/etc/systemd/system/
 cp ${DIR}/appliance/nat.service $(rootfs_dir $PKGDIR)/etc/systemd/system/
 cp ${DIR}/appliance/nat-setup $(rootfs_dir $PKGDIR)/etc/systemd/scripts
+cp ${DIR}/appliance/permissions.service $(rootfs_dir $PKGDIR)/etc/systemd/system/
+cp ${DIR}/appliance/permissions-setup $(rootfs_dir $PKGDIR)/etc/systemd/scripts
 
 mkdir -p $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants
 ln -s /etc/systemd/system/vic-init.service $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants/
 ln -s /etc/systemd/system/nat.service $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants/
+ln -s /etc/systemd/system/permissions.service $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants/
 ln -s /etc/systemd/system/multi-user.target $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants/
 
 # disable networkd given we manage the link state directly

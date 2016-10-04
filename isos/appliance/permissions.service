@@ -1,0 +1,11 @@
+[Unit]
+Description=NAT setup for bridge network
+Before=vic-init.service
+
+[Service]
+Type=oneshot
+ExecStart=/etc/systemd/scripts/permissions-setup
+RemainAfterExit=yes
+
+[Install]
+WantedBy=vic.target

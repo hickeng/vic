@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# Used by the personality
+chmod 444 /sys/class/dmi/id/product_serial
