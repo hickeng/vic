@@ -53,6 +53,8 @@ type Dispatcher struct {
 	appliance *vm.VirtualMachine
 
 	oldApplianceISO string
+
+	sshEnabled bool
 }
 
 type diagnosticLog struct {

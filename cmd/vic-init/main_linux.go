@@ -62,8 +62,9 @@ func main() {
 	// create the tether
 	tthr = tether.New(src, sink, &operations{})
 
-	// register the toolbox extension
-	tthr.Register("Toolbox", tether.NewToolbox())
+	// register the toolbox extension and configure for appliance
+	toolbox := configureToolbox(tether.NewToolbox())
+	tthr.Register("Toolbox", toolbox)
 
 	err = tthr.Start()
 	if err != nil {
@@ -95,4 +96,11 @@ func reboot() {
 
 	syscall.Sync()
 	syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
+}
+
+func configureToolbox(t *tether.Toolbox) *tether.Toolbox {
+	vix := t.Service.VixCommand
+	vix.ProcessStartCommand = startCommand
+
+	return t
 }
