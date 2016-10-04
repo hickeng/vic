@@ -74,6 +74,27 @@ Create VCH - target URL
     Run Regression Tests
     Cleanup VIC Appliance On Test Server
 
+Create VCH - thumbprint verification
+    Log To Console  \nRunning vic-machine create - thumbprint verification
+    Set Test Environment Variables
+    # TODO: need an integration/vic-test update to include the about.cert command
+    #${rc}  ${thumbprint}=  Run And Return Rc And Output  govc about.cert -k | jq -r .ThumbprintSHA1
+    ${rc}  ${thumbprint}=  Run And Return Rc And Output  openssl s_client -connect $(govc env -x GOVC_URL_HOST):443 </dev/null 2>/dev/null | openssl x509 -fingerprint -noout | cut -d= -f2
+    Should Be Equal As Integers  ${rc}  0
+    # Attempt to cleanup old/canceled tests
+    Run Keyword And Ignore Error  Cleanup Dangling VMs On Test Server
+    Run Keyword And Ignore Error  Cleanup Datastore On Test Server
+    Set Test VCH Name
+
+    Log To Console  \nInstalling VCH to test server...
+    ${output}=  Run  bin/vic-machine-linux create --insecure=false --thumbprint=${thumbprint} --name=${vch-name} --target="%{TEST_USERNAME}:%{TEST_PASSWORD}@%{TEST_URL}" --image-store=%{TEST_DATASTORE} --bridge-network=%{BRIDGE_NETWORK} --external-network=%{EXTERNAL_NETWORK}
+    Should Contain  ${output}  Installer completed successfully
+    Get Docker Params  ${output}  ${true}
+    Log To Console  Installer completed successfully: ${vch-name}...
+
+    Run Regression Tests
+    Cleanup VIC Appliance On Test Server
+
 Create VCH - full params
     Log To Console  \nRunning vic-machine create
     # Attempt to cleanup old/canceled tests

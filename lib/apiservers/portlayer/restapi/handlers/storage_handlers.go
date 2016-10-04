@@ -56,6 +56,7 @@ func (handler *StorageHandlersImpl) Configure(api *operations.PortLayerAPI, hand
 	sessionconfig := &session.Config{
 		Service:        options.PortLayerOptions.SDK,
 		Insecure:       options.PortLayerOptions.Insecure,
+		Thumbprint:     options.PortLayerOptions.Thumbprint,
 		Keepalive:      options.PortLayerOptions.Keepalive,
 		DatacenterPath: options.PortLayerOptions.DatacenterPath,
 		ClusterPath:    options.PortLayerOptions.ClusterPath,

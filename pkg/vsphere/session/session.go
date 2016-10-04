@@ -25,7 +25,6 @@
 package session
 
 import (
-	// "bytes"
 	"crypto/tls"
 	"fmt"
 	"strings"
@@ -53,6 +52,8 @@ type Config struct {
 	Service string
 	// Allow insecure connection to Service
 	Insecure bool
+	// Target thumbprint
+	Thumbprint string
 	// Keep alive duration
 	Keepalive time.Duration
 
@@ -150,6 +151,20 @@ func (s *Session) Create(ctx context.Context) (*Session, error) {
 	return s, nil
 }
 
+func (s *Session) verifyThumbprint(verr error, state tls.ConnectionState) error {
+	if verr == nil {
+		return nil
+	}
+
+	info := new(object.HostCertificateInfo).FromCertificate(state.PeerCertificates[0])
+	if info.ThumbprintSHA1 == s.Thumbprint {
+		log.Debugf("Host thumbprint matches")
+		return nil
+	}
+
+	return errors.New("Host thumbprint has changed")
+}
+
 // Connect establishes the connection for the session but nothing more
 func (s *Session) Connect(ctx context.Context) (*Session, error) {
 	soapURL, err := soap.ParseURL(s.Service)
@@ -157,53 +172,64 @@ func (s *Session) Connect(ctx context.Context) (*Session, error) {
 		return nil, errors.Errorf("SDK URL (%s) could not be parsed: %s", s.Service, err)
 	}
 
-	// update the service URL with the resolved soapURL
+	// Update the service URL with expanded defaults
 	s.Service = soapURL.String()
 
-	// we can't set a keep alive if we log in directly with client creation
-	user := soapURL.User
-	soapURL.User = nil
+	soapClient := soap.NewClient(soapURL, s.Insecure)
+	var login func(context.Context) error
 
-	// 1st connect without any userinfo to get the API type
-	s.Client, err = govmomi.NewClient(ctx, soapURL, s.Insecure)
-	if err != nil {
-		return nil, errors.Errorf("Failed to connect to %s: %s", soapURL.String(), err)
-	}
-
-	if s.HasCertificate() && s.Client.IsVC() {
-		// load the certificates
+	if s.HasCertificate() {
 		cert, err2 := tls.X509KeyPair([]byte(s.ExtensionCert), []byte(s.ExtensionKey))
 		if err2 != nil {
 			return nil, errors.Errorf("Unable to load X509 key pair(%s,%s): %s",
 				s.ExtensionCert, s.ExtensionKey, err2)
 		}
 
-		// create the new client
-		s.Client, err = govmomi.NewClientWithCertificate(ctx, soapURL, s.Insecure, cert)
-		if err != nil {
-			return nil, errors.Errorf("Failed to connect to %s: %s", soapURL.String(), err)
+		soapClient.SetCertificate(cert)
+		log.Debugf("Using login by extension %s certificate", s.ExtensionName)
+
+		login = func(ctx context.Context) error {
+			return s.LoginExtensionByCertificate(ctx, s.ExtensionName, "")
+		}
+	} else {
+		log.Debugf("Using to login by username/password")
+
+		login = func(ctx context.Context) error {
+			return s.Client.Login(ctx, soapURL.User)
 		}
 	}
 
-	if s.Keepalive != 0 {
-		// now that we've verified everything, enable keepalive
-		s.RoundTripper = session.KeepAlive(s.Client.RoundTripper, s.Keepalive)
+	if !s.Insecure {
+		if s.Thumbprint != "" {
+			soapClient.SetDialTLS(s.verifyThumbprint)
+		}
+
+		// TODO: option to set http.Client.Transport.TLSClientConfig.RootCAs
 	}
 
-	// and now that the keepalive is registered we can log in to trigger it
-	if !s.IsVC() || !s.HasCertificate() {
-		log.Debugf("Trying to log in with username/password in lieu of cert")
-		err = s.Client.Login(ctx, user)
-	} else {
-		log.Debugf("Logging into extension %s", s.ExtensionName)
-		err = s.LoginExtensionByCertificate(ctx, s.ExtensionName, "")
-	}
+	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
-		return nil, errors.Errorf("Failed to log in to %s: %s", soapURL.String(), err)
+		return nil, errors.Errorf("Failed to connect to %s: %s", s.URL().Host, err)
+	}
+
+	if s.Keepalive != 0 {
+		// TODO: add login() to the keep alive handler
+		vimClient.RoundTripper = session.KeepAlive(soapClient, s.Keepalive)
+	}
+
+	// TODO: get rid of govmomi.Client usage, only provides a few helpers we don't need.
+	s.Client = &govmomi.Client{
+		Client:         vimClient,
+		SessionManager: session.NewManager(vimClient),
+	}
+
+	err = login(ctx)
+	if err != nil {
+		return nil, errors.Errorf("Failed to log in to %s: %s", s.URL().Host, err)
 	}
 
 	s.Finder = find.NewFinder(s.Vim25(), false)
-	// log high-level environement information
+	// log high-level environment information
 	s.logEnvironmentInfo()
 	return s, nil
 }

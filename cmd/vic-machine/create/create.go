@@ -330,8 +330,7 @@ func (c *Create) processParams() error {
 	if err := c.processInsecureRegistries(); err != nil {
 		return err
 	}
-	// FIXME: add parameters for these configurations
-	c.Insecure = true
+
 	return nil
 }
 
@@ -521,7 +520,7 @@ func (c *Create) Run(cliContext *cli.Context) (err error) {
 
 	vchConfig.InsecureRegistries = c.Data.InsecureRegistries
 
-	{ // create certificates for VCH extension
+	if validator.Session.IsVC() { // create certificates for VCH extension
 		var certbuffer, keybuffer bytes.Buffer
 		if certbuffer, keybuffer, err = certificate.CreateRawKeyPair(); err != nil {
 			return errors.Errorf("Failed to create certificate for VIC vSphere extension: %s", err)
