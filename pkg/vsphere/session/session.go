@@ -209,7 +209,7 @@ func (s *Session) Connect(ctx context.Context) (*Session, error) {
 
 	vimClient, err := vim25.NewClient(ctx, soapClient)
 	if err != nil {
-		return nil, errors.Errorf("Failed to connect to %s: %s", s.URL().Host, err)
+		return nil, errors.Errorf("Failed to connect to %s: %s", soapURL.Host, err)
 	}
 
 	if s.Keepalive != 0 {
