@@ -38,6 +38,7 @@ var Logger = &logrus.Logger{
 
 // trace object used to grab run-time state
 type Message struct {
+	op       *Operation
 	msg      string
 	funcName string
 	lineNo   int
@@ -45,8 +46,10 @@ type Message struct {
 	startTime time.Time
 }
 
+const precision = 10 * time.Microsecond
+
 func (t *Message) delta() time.Duration {
-	return time.Now().Sub(t.startTime)
+	return time.Now().Truncate(precision).Sub(t.startTime.Truncate(precision))
 }
 
 func (t *Message) beginHdr() string {
@@ -58,7 +61,7 @@ func (t *Message) endHdr() string {
 }
 
 // begin a trace from this stack frame less the skip.
-func newTrace(msg string, skip int) *Message {
+func newTrace(skip int, format string, args ...interface{}) *Message {
 	pc, _, line, ok := runtime.Caller(skip)
 	if !ok {
 		return nil
@@ -66,17 +69,23 @@ func newTrace(msg string, skip int) *Message {
 
 	name := runtime.FuncForPC(pc).Name()
 
-	return &Message{
-		msg:       msg,
+	t := &Message{
+		msg:       format,
 		funcName:  name,
 		lineNo:    line,
 		startTime: time.Now(),
 	}
+
+	if format != "" {
+		t.msg = fmt.Sprintf(format, args...)
+	}
+
+	return t
 }
 
 // Begin starts the trace.  Msg is the msg to log.
 func Begin(msg string) *Message {
-	t := newTrace(msg, 2)
+	t := newTrace(2, msg)
 
 	if msg == "" {
 		Logger.Debugf(t.beginHdr())
@@ -87,7 +96,25 @@ func Begin(msg string) *Message {
 	return t
 }
 
+func BeginOp(op *Operation, format string, args ...interface{}) *Message {
+	t := newTrace(2, format, args...)
+
+	if format == "" {
+		op.Debugf(t.beginHdr())
+	} else {
+		op.Debugf("%s %s", t.beginHdr(), t.msg)
+	}
+
+	t.op = op
+	return t
+}
+
 // End ends the trace.
 func End(t *Message) {
+	if t.op != nil {
+		t.op.Debugf("%s %s", t.endHdr(), t.msg)
+		return
+	}
+
 	Logger.Debugf("%s [%s] %s", t.endHdr(), t.delta(), t.msg)
 }

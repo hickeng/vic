@@ -23,8 +23,6 @@ import (
 	"github.com/vmware/vic/lib/portlayer/constants"
 	"github.com/vmware/vic/lib/portlayer/exec"
 	"github.com/vmware/vic/pkg/trace"
-
-	log "github.com/Sirupsen/logrus"
 )
 
 func lookupVCHIP() (net.IP, error) {
@@ -46,6 +44,9 @@ func lookupVCHIP() (net.IP, error) {
 }
 
 func toggle(handle *exec.Handle, connected bool) (*exec.Handle, error) {
+	op := handle.Operation
+	defer trace.End(trace.BeginOp(op, "toggle interaction: %t", connected))
+
 	// get the virtual device list
 	devices := object.VirtualDeviceList(handle.Config.Hardware.Device)
 
@@ -64,7 +65,7 @@ func toggle(handle *exec.Handle, connected bool) (*exec.Handle, error) {
 		return nil, err
 	}
 
-	log.Debugf("Found a device with desired backing: %#v", serial)
+	op.Debugf("Found a device with desired backing: %#v", serial)
 
 	c := serial.GetVirtualDevice().Connectable
 	b := serial.GetVirtualDevice().Backing.(*types.VirtualSerialPortURIBackingInfo)
@@ -72,19 +73,19 @@ func toggle(handle *exec.Handle, connected bool) (*exec.Handle, error) {
 	serviceURI := fmt.Sprintf("tcp://%s:%d", ip, constants.SerialOverLANPort)
 
 	if b.ServiceURI == serviceURI && c.Connected == connected {
-		log.Debugf("Already in the desired state (connected: %t, serviceURI: %s)", connected, serviceURI)
+		op.Debugf("Already in the desired state (connected: %t, serviceURI: %s)", connected, serviceURI)
 		return handle, nil
 	}
 
 	// set the values
-	log.Debugf("Setting Connected to %t", connected)
+	op.Debugf("Setting Connected to %t", connected)
 	c.Connected = connected
 	if connected && handle.ExecConfig.Sessions[handle.ExecConfig.ID].Attach {
-		log.Debugf("Setting the start connected state to %t", connected)
+		op.Debugf("Setting the start connected state to %t", connected)
 		c.StartConnected = handle.ExecConfig.Sessions[handle.ExecConfig.ID].Attach
 	}
 
-	log.Debugf("Setting ServiceURI to %s", serviceURI)
+	op.Debugf("Setting ServiceURI to %s", serviceURI)
 	b.ServiceURI = serviceURI
 
 	config := &types.VirtualDeviceConfigSpec{
@@ -98,12 +99,13 @@ func toggle(handle *exec.Handle, connected bool) (*exec.Handle, error) {
 
 // Join adds network backed serial port to the caller and configures them
 func Join(h interface{}) (interface{}, error) {
-	defer trace.End(trace.Begin(""))
-
 	handle, ok := h.(*exec.Handle)
 	if !ok {
 		return nil, fmt.Errorf("Type assertion failed for %#+v", handle)
 	}
+
+	op := handle.Operation
+	defer trace.End(trace.BeginOp(op, "join interaction: %s", handle.String()))
 
 	// Tether serial port - backed by network
 	serial := &types.VirtualSerialPort{
@@ -134,12 +136,14 @@ func Join(h interface{}) (interface{}, error) {
 
 // Bind sets the *Connected fields of the VirtualSerialPort
 func Bind(h interface{}) (interface{}, error) {
-	defer trace.End(trace.Begin(""))
-
 	handle, ok := h.(*exec.Handle)
 	if !ok {
 		return nil, fmt.Errorf("Type assertion failed for %#+v", handle)
 	}
+
+	op := handle.Operation
+	defer trace.End(trace.BeginOp(op, "bind interaction: %s", handle.String()))
+
 	return toggle(handle, true)
 }
 
@@ -151,5 +155,9 @@ func Unbind(h interface{}) (interface{}, error) {
 	if !ok {
 		return nil, fmt.Errorf("Type assertion failed for %#+v", handle)
 	}
+
+	op := handle.Operation
+	defer trace.End(trace.BeginOp(op, "unbind interaction: %s", handle.String()))
+
 	return toggle(handle, false)
 }

@@ -65,19 +65,17 @@ func (handler *ContainersHandlersImpl) Configure(api *operations.PortLayerAPI, h
 
 // CreateHandler creates a new container
 func (handler *ContainersHandlersImpl) CreateHandler(params containers.CreateParams) middleware.Responder {
-	defer trace.End(trace.Begin(""))
-
 	var err error
+	id := uid.New().String()
+	name := *params.CreateConfig.Name
+
+	op := trace.NewOperation(context.Background(), "create container")
+	defer trace.End(trace.BeginOp(&op, "create %s:%s", name, id))
 
 	session := handler.handlerCtx.Session
 
-	ctx := context.Background()
-
-	log.Debugf("Path: %#v", params.CreateConfig.Path)
-	log.Debugf("Args: %#v", params.CreateConfig.Args)
-	log.Debugf("Env: %#v", params.CreateConfig.Env)
-	log.Debugf("WorkingDir: %#v", params.CreateConfig.WorkingDir)
-	id := uid.New().String()
+	op.Infof("Path: %#v", params.CreateConfig.Path)
+	op.Debugf("WorkingDir: %#v", params.CreateConfig.WorkingDir)
 
 	// Init key for tether
 	privateKey, err := rsa.GenerateKey(rand.Reader, 512)
@@ -93,7 +91,7 @@ func (handler *ContainersHandlersImpl) CreateHandler(params containers.CreatePar
 	m := &executor.ExecutorConfig{
 		Common: executor.Common{
 			ID:   id,
-			Name: *params.CreateConfig.Name,
+			Name: name,
 		},
 		CreateTime: time.Now().UTC().Unix(),
 		Version:    version.GetBuild(),
@@ -101,7 +99,7 @@ func (handler *ContainersHandlersImpl) CreateHandler(params containers.CreatePar
 			id: &executor.SessionConfig{
 				Common: executor.Common{
 					ID:   id,
-					Name: *params.CreateConfig.Name,
+					Name: name,
 				},
 				Tty:    *params.CreateConfig.Tty,
 				Attach: *params.CreateConfig.Attach,
@@ -126,8 +124,6 @@ func (handler *ContainersHandlersImpl) CreateHandler(params containers.CreatePar
 		}
 	}
 
-	log.Infof("CreateHandler Metadata: %#v", m)
-
 	// Create the executor.ExecutorCreateConfig
 	c := &exec.ContainerCreateConfig{
 		Metadata:       m,
@@ -135,9 +131,9 @@ func (handler *ContainersHandlersImpl) CreateHandler(params containers.CreatePar
 		ImageStoreName: params.CreateConfig.ImageStore.Name,
 	}
 
-	h, err := exec.Create(ctx, session, c)
+	h, err := exec.Create(&op, session, c)
 	if err != nil {
-		log.Errorf("ContainerCreate error: %s", err.Error())
+		op.Errorf("ContainerCreate error: %s", err.Error())
 		return containers.NewCreateNotFound().WithPayload(&models.Error{Message: err.Error()})
 	}
 
@@ -147,12 +143,14 @@ func (handler *ContainersHandlersImpl) CreateHandler(params containers.CreatePar
 
 // StateChangeHandler changes the state of a container
 func (handler *ContainersHandlersImpl) StateChangeHandler(params containers.StateChangeParams) middleware.Responder {
-	defer trace.End(trace.Begin(fmt.Sprintf("handle(%s)", params.Handle)))
-
 	h := exec.GetHandle(params.Handle)
 	if h == nil {
 		return containers.NewStateChangeNotFound()
 	}
+
+	id := h.ExecConfig.ID
+	op := h.Operation
+	defer trace.End(trace.BeginOp(op, "power change %s: %s", id, params.State))
 
 	var state exec.State
 	switch params.State {
@@ -171,7 +169,6 @@ func (handler *ContainersHandlersImpl) StateChangeHandler(params containers.Stat
 }
 
 func (handler *ContainersHandlersImpl) GetStateHandler(params containers.GetStateParams) middleware.Responder {
-	defer trace.End(trace.Begin(fmt.Sprintf("handle(%s)", params.Handle)))
 
 	// NOTE: I've no idea why GetStateHandler takes a handle instead of an ID - hopefully there was a reason for an inspection
 	// operation to take this path
@@ -179,6 +176,9 @@ func (handler *ContainersHandlersImpl) GetStateHandler(params containers.GetStat
 	if h == nil || h.ExecConfig == nil {
 		return containers.NewGetStateNotFound()
 	}
+
+	op := h.Operation
+	defer trace.End(trace.BeginOp(op, "power state from handle: %s", h.String()))
 
 	container := exec.Containers.Container(h.ExecConfig.ID)
 	if container == nil {
@@ -200,50 +200,64 @@ func (handler *ContainersHandlersImpl) GetStateHandler(params containers.GetStat
 		return containers.NewGetStateDefault(http.StatusServiceUnavailable)
 	}
 
+	op.Debugf("power state: %s", state)
 	return containers.NewGetStateOK().WithPayload(&models.ContainerGetStateResponse{Handle: h.String(), State: state})
 }
 
 func (handler *ContainersHandlersImpl) GetHandler(params containers.GetParams) middleware.Responder {
-	defer trace.End(trace.Begin(params.ID))
+	op := trace.NewOperation(context.Background(), "new handle")
+	defer trace.End(trace.BeginOp(&op, "new handle: %s", params.ID))
 
-	h := exec.GetContainer(context.Background(), uid.Parse(params.ID))
+	h := exec.GetContainer(&op, uid.Parse(params.ID))
 	if h == nil {
+		op.Errorf("no such container")
 		return containers.NewGetNotFound().WithPayload(&models.Error{Message: fmt.Sprintf("container %s not found", params.ID)})
 	}
+
+	op.Infof("new handle: %s", h.String())
 
 	return containers.NewGetOK().WithPayload(h.String())
 }
 
 func (handler *ContainersHandlersImpl) CommitHandler(params containers.CommitParams) middleware.Responder {
-	defer trace.End(trace.Begin(fmt.Sprintf("handle(%s)", params.Handle)))
-
 	h := exec.GetHandle(params.Handle)
 	if h == nil {
+		log.Errorf("handle not found: %s", params.Handle)
 		return containers.NewCommitNotFound().WithPayload(&models.Error{Message: "container not found"})
 	}
 
-	if err := h.Commit(context.Background(), handler.handlerCtx.Session, params.WaitTime); err != nil {
-		log.Errorf("CommitHandler error on handle(%s) for %s: %#v", h.String(), h.ExecConfig.ID, err)
+	op := h.Operation
+	defer trace.End(trace.BeginOp(op, "commit handle: %s", params.Handle))
+
+	if err := h.Commit(op, handler.handlerCtx.Session, params.WaitTime); err != nil {
 		switch err := err.(type) {
 		case exec.ConcurrentAccessError:
+			op.Errorf("commit failed due to concurrent modification: %#v", err)
+
 			return containers.NewCommitConflict().WithPayload(&models.Error{Message: err.Error()})
 		default:
+			op.Errorf("commit error: %#v", err)
+
 			return containers.NewCommitDefault(http.StatusServiceUnavailable).WithPayload(&models.Error{Message: err.Error()})
 		}
 	}
 
+	op.Errorf("committed handle")
 	return containers.NewCommitOK()
 }
 
 func (handler *ContainersHandlersImpl) RemoveContainerHandler(params containers.ContainerRemoveParams) middleware.Responder {
-	defer trace.End(trace.Begin(params.ID))
+	// NOTE: why does this not require a handle?
 
 	// get the indicated container for removal
 	cID := uid.Parse(params.ID)
-	h := exec.GetContainer(context.Background(), cID)
+	h := exec.GetContainer(nil, cID)
 	if h == nil || h.ExecConfig == nil {
 		return containers.NewContainerRemoveNotFound()
 	}
+
+	op := h.Operation
+	defer trace.End(trace.BeginOp(op, "remove container: %s (handle: %s)", cID, h.String()))
 
 	container := exec.Containers.Container(h.ExecConfig.ID)
 	if container == nil {
@@ -251,7 +265,7 @@ func (handler *ContainersHandlersImpl) RemoveContainerHandler(params containers.
 	}
 
 	// NOTE: this should allowing batching of operations, as with Create, Start, Stop, et al
-	err := container.Remove(context.Background(), handler.handlerCtx.Session)
+	err := container.Remove(op, handler.handlerCtx.Session)
 	if err != nil {
 		switch err := err.(type) {
 		case exec.NotFoundError:
@@ -267,7 +281,8 @@ func (handler *ContainersHandlersImpl) RemoveContainerHandler(params containers.
 }
 
 func (handler *ContainersHandlersImpl) GetContainerInfoHandler(params containers.GetContainerInfoParams) middleware.Responder {
-	defer trace.End(trace.Begin(params.ID))
+	op := trace.NewOperation(context.Background(), fmt.Sprintf("container info: %s", params.ID))
+	defer trace.End(trace.BeginOp(&op, "container info: %s", params.ID))
 
 	container := exec.Containers.Container(params.ID)
 	if container == nil {
@@ -281,7 +296,8 @@ func (handler *ContainersHandlersImpl) GetContainerInfoHandler(params containers
 }
 
 func (handler *ContainersHandlersImpl) GetContainerListHandler(params containers.GetContainerListParams) middleware.Responder {
-	defer trace.End(trace.Begin(""))
+	op := trace.NewOperation(context.Background(), "list containers")
+	defer trace.End(trace.BeginOp(&op, "list containers"))
 
 	var state *exec.State
 	if params.All != nil && !*params.All {
@@ -301,7 +317,8 @@ func (handler *ContainersHandlersImpl) GetContainerListHandler(params containers
 }
 
 func (handler *ContainersHandlersImpl) ContainerSignalHandler(params containers.ContainerSignalParams) middleware.Responder {
-	defer trace.End(trace.Begin(params.ID))
+	op := trace.NewOperation(context.Background(), "signal container")
+	defer trace.End(trace.BeginOp(&op, "signal container: %s", params.ID))
 
 	// NOTE: I feel that this should be in a Commit path for consistency
 	// it would allow phrasings such as:
@@ -313,7 +330,7 @@ func (handler *ContainersHandlersImpl) ContainerSignalHandler(params containers.
 		return containers.NewContainerSignalNotFound().WithPayload(&models.Error{Message: fmt.Sprintf("container %s not found", params.ID)})
 	}
 
-	err := container.Signal(context.Background(), params.Signal)
+	err := container.Signal(&op, params.Signal)
 	if err != nil {
 		return containers.NewContainerSignalInternalServerError().WithPayload(&models.Error{Message: err.Error()})
 	}
@@ -322,7 +339,8 @@ func (handler *ContainersHandlersImpl) ContainerSignalHandler(params containers.
 }
 
 func (handler *ContainersHandlersImpl) GetContainerLogsHandler(params containers.GetContainerLogsParams) middleware.Responder {
-	defer trace.End(trace.Begin(params.ID))
+	op := trace.NewOperation(context.Background(), "container logs")
+	defer trace.End(trace.BeginOp(&op, "container logs: %s", params.ID))
 
 	container := exec.Containers.Container(params.ID)
 	if container == nil {
@@ -342,7 +360,7 @@ func (handler *ContainersHandlersImpl) GetContainerLogsHandler(params containers
 		tail = int(*params.Taillines)
 	}
 
-	reader, err := container.LogReader(context.Background(), tail, follow)
+	reader, err := container.LogReader(&op, tail, follow)
 	if err != nil {
 		return containers.NewGetContainerLogsInternalServerError().WithPayload(&models.Error{Message: err.Error()})
 	}
@@ -353,7 +371,8 @@ func (handler *ContainersHandlersImpl) GetContainerLogsHandler(params containers
 }
 
 func (handler *ContainersHandlersImpl) ContainerWaitHandler(params containers.ContainerWaitParams) middleware.Responder {
-	defer trace.End(trace.Begin(fmt.Sprintf("%s:%d", params.ID, params.Timeout)))
+	op := trace.NewOperation(context.Background(), "container wait")
+	defer trace.End(trace.BeginOp(&op, "container wait: %s:%d", params.ID, params.Timeout))
 
 	// default context timeout in seconds
 	defaultTimeout := int64(containerWaitTimeout.Seconds())

@@ -69,17 +69,18 @@ func (i *InteractionHandlersImpl) Configure(api *operations.PortLayerAPI, _ *Han
 
 // JoinHandler calls the Join
 func (i *InteractionHandlersImpl) JoinHandler(params interaction.InteractionJoinParams) middleware.Responder {
-	defer trace.End(trace.Begin(""))
-
 	handle := exec.HandleFromInterface(params.Config.Handle)
 	if handle == nil {
 		err := &models.Error{Message: "Failed to get the Handle"}
 		return interaction.NewInteractionJoinInternalServerError().WithPayload(err)
 	}
 
+	op := handle.Operation
+	defer trace.End(trace.BeginOp(op, "interface join: %s", handle.String()))
+
 	handleprime, err := attach.Join(handle)
 	if err != nil {
-		log.Errorf("%s", err.Error())
+		op.Errorf("%s", err.Error())
 
 		return interaction.NewInteractionJoinInternalServerError().WithPayload(
 			&models.Error{Message: err.Error()},
@@ -93,7 +94,6 @@ func (i *InteractionHandlersImpl) JoinHandler(params interaction.InteractionJoin
 
 // BindHandler calls the Bind
 func (i *InteractionHandlersImpl) BindHandler(params interaction.InteractionBindParams) middleware.Responder {
-	defer trace.End(trace.Begin(""))
 
 	handle := exec.HandleFromInterface(params.Config.Handle)
 	if handle == nil {
@@ -101,9 +101,12 @@ func (i *InteractionHandlersImpl) BindHandler(params interaction.InteractionBind
 		return interaction.NewInteractionBindInternalServerError().WithPayload(err)
 	}
 
+	op := handle.Operation
+	defer trace.End(trace.BeginOp(op, "bind interaction: %s", handle.String()))
+
 	handleprime, err := attach.Bind(handle)
 	if err != nil {
-		log.Errorf("%s", err.Error())
+		op.Errorf("%s", err.Error())
 
 		return interaction.NewInteractionBindInternalServerError().WithPayload(
 			&models.Error{Message: err.Error()},
@@ -118,7 +121,6 @@ func (i *InteractionHandlersImpl) BindHandler(params interaction.InteractionBind
 
 // UnbindHandler calls the Unbind
 func (i *InteractionHandlersImpl) UnbindHandler(params interaction.InteractionUnbindParams) middleware.Responder {
-	defer trace.End(trace.Begin(""))
 
 	handle := exec.HandleFromInterface(params.Config.Handle)
 	if handle == nil {
@@ -126,9 +128,12 @@ func (i *InteractionHandlersImpl) UnbindHandler(params interaction.InteractionUn
 		return interaction.NewInteractionUnbindInternalServerError().WithPayload(err)
 	}
 
+	op := handle.Operation
+	defer trace.End(trace.BeginOp(op, "unbind interaction: %s", handle.String()))
+
 	handleprime, err := attach.Unbind(handle)
 	if err != nil {
-		log.Errorf("%s", err.Error())
+		op.Errorf("%s", err.Error())
 
 		return interaction.NewInteractionUnbindInternalServerError().WithPayload(
 			&models.Error{Message: err.Error()},
@@ -143,10 +148,13 @@ func (i *InteractionHandlersImpl) UnbindHandler(params interaction.InteractionUn
 
 // ContainerResizeHandler calls resize
 func (i *InteractionHandlersImpl) ContainerResizeHandler(params interaction.ContainerResizeParams) middleware.Responder {
+	op := trace.NewOperation(context.Background(), fmt.Sprintf("interaction resize: %s", params.ID))
+	defer trace.End(trace.BeginOp(&op, "interaction resize: %s", params.ID))
+
 	// Get the session to the container
-	session, err := i.attachServer.Get(context.Background(), params.ID, interactionTimeout)
+	session, err := i.attachServer.Get(&op, params.ID, interactionTimeout)
 	if err != nil {
-		log.Errorf("%s", err.Error())
+		op.Errorf("%s", err.Error())
 
 		e := &models.Error{
 			Message: fmt.Sprintf("No resize connection found (id: %s): %s", params.ID, err.Error()),
@@ -159,7 +167,7 @@ func (i *InteractionHandlersImpl) ContainerResizeHandler(params interaction.Cont
 	cHeight := uint32(params.Height)
 
 	if err = session.Resize(cWidth, cHeight, 0, 0); err != nil {
-		log.Errorf("%s", err.Error())
+		op.Errorf("%s", err.Error())
 
 		return interaction.NewContainerResizeInternalServerError().WithPayload(
 			&models.Error{Message: err.Error()},

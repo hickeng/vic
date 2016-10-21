@@ -21,7 +21,8 @@ import (
 	"math/rand"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/vmware/vic/pkg/trace"
+
 	"github.com/vmware/govmomi/task"
 	"github.com/vmware/govmomi/vim25/progress"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -60,16 +61,21 @@ func WaitForResult(ctx context.Context, f func(context.Context) (Task, error)) (
 	var info *types.TaskInfo
 	var backoffFactor int64 = 1
 
+	op, err := trace.FromContext(ctx)
+	if err != nil {
+		op = trace.NewOperation(ctx, "run vsphere task")
+	}
+
 	for {
 		var t Task
-		if t, err = f(ctx); err == nil {
+		if t, err = f(op); err == nil {
 			info, err = t.WaitForResult(ctx, nil)
 			if err == nil {
 				return info, err
 			}
 		}
 
-		log.Errorf("task failed: %s", err)
+		op.Errorf("task failed: %s", err)
 		if !isTaskInProgress(err) {
 			return info, err
 		}
@@ -82,10 +88,10 @@ func WaitForResult(ctx context.Context, f func(context.Context) (Task, error)) (
 				backoffFactor = maxBackoffFactor
 			}
 		case <-ctx.Done():
-			return info, ctx.Err()
+			return info, op.Err()
 		}
 
-		log.Warnf("retrying task")
+		op.Warnf("retrying task")
 	}
 }
 

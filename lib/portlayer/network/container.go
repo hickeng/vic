@@ -19,6 +19,7 @@ import (
 	"sync"
 
 	"github.com/vmware/vic/lib/portlayer/exec"
+	"github.com/vmware/vic/pkg/trace"
 	"github.com/vmware/vic/pkg/uid"
 	"golang.org/x/net/context"
 )
@@ -99,7 +100,8 @@ func (c *Container) Refresh(ctx context.Context) error {
 
 	// this will "refresh" the container executor config that contains
 	// the current ip addresses
-	h := exec.GetContainer(ctx, c.ID())
+	op := trace.NewOperation(ctx, "container refresh for network")
+	h := exec.GetContainer(&op, c.ID())
 	if h == nil {
 		return fmt.Errorf("could not find container %s", c.ID())
 	}

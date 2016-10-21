@@ -50,7 +50,7 @@ func newOperation(ctx context.Context, id string, skip int, msg string) Operatio
 		id: id,
 
 		// Start the trace.
-		t: []Message{*newTrace(msg, skip)},
+		t: []Message{*newTrace(skip, msg)},
 	}
 
 	// We need to be able to identify this operation across API (and process)
@@ -69,8 +69,12 @@ func newOperation(ctx context.Context, id string, skip int, msg string) Operatio
 
 // Creates a header string to be printed.
 func (o *Operation) header() string {
+	if o == nil {
+		return "op=<nil>"
+	}
+
 	if Logger.Level >= logrus.DebugLevel {
-		return fmt.Sprintf("op=%s (delta:%s)", o.id, o.t[0].delta())
+		return fmt.Sprintf("op=%s (delta:%10s)", o.id, o.t[0].delta())
 	}
 	return fmt.Sprintf("op=%s", o.id)
 }
@@ -86,7 +90,7 @@ func (o Operation) Err() error {
 		buf := &bytes.Buffer{}
 
 		// Add a frame for this Err call, then walk the stack
-		currFrame := newTrace("Err", 2)
+		currFrame := newTrace(2, "Err")
 		fmt.Fprintf(buf, "%s: %s error: %s\n", currFrame.funcName, o.t[0].msg, err)
 
 		// handle the carriage return
@@ -108,6 +112,10 @@ func (o Operation) Err() error {
 	}
 
 	return nil
+}
+
+func (o *Operation) Warnf(format string, args ...interface{}) {
+	Logger.Warnf("%s: %s", o.header(), fmt.Sprintf(format, args...))
 }
 
 func (o *Operation) Infof(format string, args ...interface{}) {
@@ -137,7 +145,7 @@ func NewOperation(ctx context.Context, msg string) Operation {
 	o := newOperation(ctx, opID(atomic.AddUint64(&opCount, 1)), 3, msg)
 
 	frame := o.t[0]
-	o.Debugf("[NewOperation] %s [%s:%d]", o.header(), frame.funcName, frame.lineNo)
+	o.Debugf("[NewOperation] %s [%s:%d]: %s", o.header(), frame.funcName, frame.lineNo, msg)
 	return o
 }
 

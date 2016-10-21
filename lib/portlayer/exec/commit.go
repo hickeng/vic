@@ -26,13 +26,11 @@ import (
 	"github.com/vmware/vic/pkg/vsphere/session"
 	"github.com/vmware/vic/pkg/vsphere/tasks"
 	"github.com/vmware/vic/pkg/vsphere/vm"
-
-	log "github.com/Sirupsen/logrus"
 )
 
 // Commit executes the requires steps on the handle
-func Commit(ctx context.Context, sess *session.Session, h *Handle, waitTime *int32) error {
-	defer trace.End(trace.Begin(h.ExecConfig.ID))
+func Commit(op *trace.Operation, sess *session.Session, h *Handle, waitTime *int32) error {
+	defer trace.End(trace.BeginOp(op, "commit: %s", h.String()))
 
 	c := Containers.Container(h.ExecConfig.ID)
 	creation := h.vm == nil
@@ -59,31 +57,31 @@ func Commit(ctx context.Context, sess *session.Session, h *Handle, waitTime *int
 		var err error
 		if sess.IsVC() && Config.VirtualApp.ResourcePool != nil {
 			// Create the vm
-			res, err = tasks.WaitForResult(ctx, func(ctx context.Context) (tasks.Task, error) {
+			res, err = tasks.WaitForResult(op, func(ctx context.Context) (tasks.Task, error) {
 				return Config.VirtualApp.CreateChildVM_Task(ctx, *h.Spec.Spec(), nil)
 			})
 		} else {
 			// Find the Virtual Machine folder that we use
 			var folders *object.DatacenterFolders
-			folders, err = sess.Datacenter.Folders(ctx)
+			folders, err = sess.Datacenter.Folders(op)
 			if err != nil {
-				log.Errorf("Could not get folders")
+				op.Errorf("Could not get folders")
 				return err
 			}
 			parent := folders.VmFolder
 
 			// Create the vm
-			res, err = tasks.WaitForResult(ctx, func(ctx context.Context) (tasks.Task, error) {
+			res, err = tasks.WaitForResult(op, func(ctx context.Context) (tasks.Task, error) {
 				return parent.CreateVM(ctx, *h.Spec.Spec(), Config.ResourcePool, nil)
 			})
 		}
 
 		if err != nil {
-			log.Errorf("Something failed. Spec was %+v", *h.Spec.Spec())
+			op.Errorf("Something failed. Spec was %+v", *h.Spec.Spec())
 			return err
 		}
 
-		h.vm = vm.NewVirtualMachine(ctx, sess, res.Result.(types.ManagedObjectReference))
+		h.vm = vm.NewVirtualMachine(op, sess, res.Result.(types.ManagedObjectReference))
 		c = newContainer(&h.containerBase)
 		Containers.Put(c)
 		// inform of creation irrespective of remaining operations
@@ -95,61 +93,69 @@ func Commit(ctx context.Context, sess *session.Session, h *Handle, waitTime *int
 	}
 
 	// if we're stopping the VM, do so before the reconfigure to preserve the extraconfig
-	poweroff := false
 	if h.TargetState() == StateStopped {
 		if h.Runtime == nil {
-			log.Warnf("Commit called with incomplete runtime state for %s", h.ExecConfig.ID)
+			op.Warnf("Commit called with incomplete runtime state for %s", h.ExecConfig.ID)
 		}
 
 		if h.Runtime != nil && h.Runtime.PowerState == types.VirtualMachinePowerStatePoweredOff {
-			log.Infof("Dropping duplicate power off operation for %s", h.ExecConfig.ID)
+			op.Infof("Dropping duplicate power off operation for %s", h.ExecConfig.ID)
 		} else {
-			poweroff = true
 			// stop the container
-			if err := c.stop(ctx, waitTime); err != nil {
+			if err := c.stop(op, waitTime); err != nil {
 				return err
 			}
-		}
 
-		// inform of creation irrespective of remaining operations
-		publishContainerEvent(h.ExecConfig.ID, time.Now().UTC(), events.ContainerStopped)
+			// inform of creation irrespective of remaining operations
+			publishContainerEvent(h.ExecConfig.ID, time.Now().UTC(), events.ContainerStopped)
+
+			// we must refresh now to get the new ChangeVersion - this is used to gate on powerstate in the reconfigure
+			// because we cannot set the ExtraConfig if the VM is powered on. There is still a race here unfortunately because
+			// tasks don't appear to contain the new ChangeVersion
+			// we don't use refresh because we want to keep the extraconfig state
+			base, err := h.updates(op)
+			if err != nil {
+				// TODO: can we recover here, or at least set useful state for inspection?
+				return err
+			}
+			h.Runtime = base.Runtime
+			h.Config = base.Config
+		}
 	}
 
 	// reconfigure operation
 	if h.Spec != nil {
-		s := h.Spec.Spec()
-
 		if h.Runtime == nil {
-			log.Errorf("Refusing to perform reconfigure operation with incomplete runtime state for %s", h.ExecConfig.ID)
+			op.Errorf("Refusing to perform reconfigure operation with incomplete runtime state for %s", h.ExecConfig.ID)
 		} else {
+			s := h.Spec.Spec()
+			// ensure that our logic based on Runtime state remains valid
+
+			// NOTE: this inline refresh can be removed when switching away from guestinfo where we have non-persistence issues
+			// when updating ExtraConfig via the API with a powered on VM - we therefore have to be absolutely certain about the
+			// power state to decide if we can continue without nilifying extraconfig
+			// s.ChangeVersion = h.Config.ChangeVersion
+
+			// FIXME!!! this is a temporary hack until the concurrent modification retry logic is in place
+			s.ChangeVersion = ""
+
 			// nilify ExtraConfig if vm is running
 			if h.Runtime.PowerState == types.VirtualMachinePowerStatePoweredOn {
-				log.Errorf("Nilifying ExtraConfig as we are running")
+				op.Errorf("Nilifying ExtraConfig as we are running")
 				s.ExtraConfig = nil
 			}
 
-			// if we've performed a power operation then the ChangeVersion in the spec *cannot* be correct
-			// We could update the VM config to get a new ChangeVersion, but that offers exactly the same
-			// guarantees as just clearing the ChangeVersion
-
-			// ChangeVersion. This property is useful because it guards against updates that have happened between when the VM’s config is read and when it is applied.
-			// Will return "Cannot complete operation due to concurrent modification by another operation.." on failure
-			// This is nilled
-			if poweroff {
-				s.ChangeVersion = ""
-			}
-
-			_, err := tasks.WaitForResult(ctx, func(ctx context.Context) (tasks.Task, error) {
+			_, err := tasks.WaitForResult(op, func(ctx context.Context) (tasks.Task, error) {
 				return h.vm.Reconfigure(ctx, *s)
 			})
 			if err != nil {
-				log.Errorf("Reconfigure failed with %#+v", err)
+				op.Errorf("Reconfigure failed with %#+v", err)
 
 				// Check whether we get ConcurrentAccess and wrap it if needed
 				if f, ok := err.(types.HasFault); ok {
 					switch f.Fault().(type) {
 					case *types.ConcurrentAccess:
-						log.Errorf("We have ConcurrentAccess for version %s", s.ChangeVersion)
+						op.Errorf("We have ConcurrentAccess for version %s", s.ChangeVersion)
 
 						return ConcurrentAccessError{err}
 					}
@@ -159,18 +165,24 @@ func Commit(ctx context.Context, sess *session.Session, h *Handle, waitTime *int
 		}
 	}
 
+	// best effort update of container cache using committed state - this will not reflect the power on below, however
+	// this is primarily for updating ExtraConfig state.
+	if !creation {
+		defer c.RefreshFromHandle(op, h)
+	}
+
 	if h.TargetState() == StateRunning {
 		if h.Runtime != nil && h.Runtime.PowerState == types.VirtualMachinePowerStatePoweredOn {
-			log.Infof("Dropping duplicate power on operation for %s", h.ExecConfig.ID)
+			op.Infof("Dropping duplicate power on operation for %s", h.ExecConfig.ID)
 			return nil
 		}
 
 		if h.Runtime == nil && !creation {
-			log.Warnf("Commit called with incomplete runtime state for %s", h.ExecConfig.ID)
+			op.Warnf("Commit called with incomplete runtime state for %s", h.ExecConfig.ID)
 		}
 
 		// start the container
-		if err := c.start(ctx); err != nil {
+		if err := c.start(op); err != nil {
 			return err
 		}
 

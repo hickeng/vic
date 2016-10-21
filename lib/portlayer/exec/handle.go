@@ -26,7 +26,6 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/golang/groupcache/lru"
-	"golang.org/x/net/context"
 
 	"github.com/vmware/govmomi/vim25/types"
 	"github.com/vmware/vic/lib/config/executor"
@@ -68,6 +67,9 @@ type Handle struct {
 	// desired state
 	targetState State
 
+	// allow for cross call tracing
+	Operation *trace.Operation
+
 	// allow for passing outside of the process
 	key string
 }
@@ -84,7 +86,7 @@ func newHandleKey() string {
 func TestHandle(id string) *Handle {
 	defer trace.End(trace.Begin("Handle.Create"))
 
-	h := newHandle(&Container{})
+	h := newHandle(nil, &Container{})
 	h.ExecConfig.ID = id
 
 	return h
@@ -92,7 +94,7 @@ func TestHandle(id string) *Handle {
 
 // newHandle creates a handle for an existing container
 // con must not be nil
-func newHandle(con *Container) *Handle {
+func newHandle(op *trace.Operation, con *Container) *Handle {
 	h := &Handle{
 		key:           newHandleKey(),
 		targetState:   StateUnknown,
@@ -102,6 +104,14 @@ func newHandle(con *Container) *Handle {
 		Spec: &spec.VirtualMachineConfigSpec{
 			VirtualMachineConfigSpec: &types.VirtualMachineConfigSpec{},
 		},
+
+		Operation: op,
+	}
+
+	// ensure there's always an operation
+	if h.Operation == nil {
+		o := trace.NewOperation(op, "new handle")
+		h.Operation = &o
 	}
 
 	handlesLock.Lock()
@@ -167,7 +177,9 @@ func (h *Handle) String() string {
 	return h.key
 }
 
-func (h *Handle) Commit(ctx context.Context, sess *session.Session, waitTime *int32) error {
+func (h *Handle) Commit(op *trace.Operation, sess *session.Session, waitTime *int32) error {
+	defer trace.End(trace.BeginOp(op, "commit: %s", h.String()))
+
 	cfg := make(map[string]string)
 
 	// Set timestamps based on target state
@@ -188,7 +200,7 @@ func (h *Handle) Commit(ctx context.Context, sess *session.Session, waitTime *in
 	s := h.Spec.Spec()
 	s.ExtraConfig = append(s.ExtraConfig, vmomi.OptionValueFromMap(cfg)...)
 
-	if err := Commit(ctx, sess, h, waitTime); err != nil {
+	if err := Commit(op, sess, h, waitTime); err != nil {
 		return err
 	}
 
@@ -197,6 +209,8 @@ func (h *Handle) Commit(ctx context.Context, sess *session.Session, waitTime *in
 }
 
 func (h *Handle) Close() {
+	h.Operation.Infof("removing handle: %s", h.String())
+
 	removeHandle(h.key)
 }
 
@@ -205,19 +219,39 @@ func (h *Handle) Close() {
 //
 // TODO: either deep copy the configuration, or provide an alternative means of passing the data that
 // avoids the need for the caller to unpack/repack the parameters
-func Create(ctx context.Context, sess *session.Session, config *ContainerCreateConfig) (*Handle, error) {
-	defer trace.End(trace.Begin("Handle.Create"))
-
+func Create(op *trace.Operation, sess *session.Session, config *ContainerCreateConfig) (*Handle, error) {
+	// we're not using newHandle so that this can be fully massaged before being added to the
+	// map - this is only needed while Handle mixes ChangeSet with network serialization
 	h := &Handle{
 		key:         newHandleKey(),
 		targetState: StateCreated,
 		containerBase: containerBase{
 			ExecConfig: config.Metadata,
 		},
+		Operation: op,
 	}
+
+	// ensure there's always an operation
+	if h.Operation == nil {
+		o := trace.NewOperation(op, "new handle")
+		op = &o
+		h.Operation = op
+	}
+
+	defer trace.End(trace.BeginOp(op, "creation handle: %s", h.String()))
 
 	// configure with debug
 	h.ExecConfig.Diagnostics.DebugLevel = Config.DebugLevel
+
+	if Config.DebugLevel > 2 {
+		// these could well contain customer confidential data
+		for id, s := range config.Metadata.Sessions {
+			op.Debugf("%s: Args: %#v", id, s.Cmd.Args)
+			op.Debugf("%s: Env: %#v", id, s.Cmd.Env)
+		}
+
+		op.Debugf("CreateHandler Metadata: %#v", config)
+	}
 
 	// Convert the management hostname to IP
 	ips, err := net.LookupIP(constants.ManagementHostName)
@@ -261,12 +295,12 @@ func Create(ctx context.Context, sess *session.Session, config *ContainerCreateC
 
 		Metadata: config.Metadata,
 	}
-	log.Debugf("Config: %#v", specconfig)
+	op.Debugf("Config: %#v", specconfig)
 
 	// Create a linux guest
-	linux, err := guest.NewLinuxGuest(ctx, sess, specconfig)
+	linux, err := guest.NewLinuxGuest(op, sess, specconfig)
 	if err != nil {
-		log.Errorf("Failed during linux specific spec generation during create of %s: %s", config.Metadata.ID, err)
+		op.Errorf("Failed during linux specific spec generation during create of %s: %s", config.Metadata.ID, err)
 		return nil, err
 	}
 

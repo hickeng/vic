@@ -27,6 +27,7 @@ import (
 	"github.com/vmware/vic/lib/portlayer/event"
 	"github.com/vmware/vic/lib/portlayer/event/collector/vsphere"
 	"github.com/vmware/vic/lib/portlayer/event/events"
+	"github.com/vmware/vic/pkg/trace"
 	"github.com/vmware/vic/pkg/vsphere/extraconfig"
 	"github.com/vmware/vic/pkg/vsphere/session"
 )
@@ -36,6 +37,8 @@ var initializer sync.Once
 func Init(ctx context.Context, sess *session.Session, source extraconfig.DataSource, _ extraconfig.DataSink) error {
 	var err error
 	initializer.Do(func() {
+		op := trace.NewOperation(ctx, "system initialization")
+
 		f := find.NewFinder(sess.Vim25(), false)
 
 		extraconfig.Decode(source, &Config)
@@ -50,7 +53,7 @@ func Init(ctx context.Context, sess *session.Session, source extraconfig.DataSou
 
 		cr := Config.ComputeResources[0]
 		var r object.Reference
-		r, err = f.ObjectReference(ctx, cr)
+		r, err = f.ObjectReference(&op, cr)
 		if err != nil {
 			err = fmt.Errorf("could not get resource pool or virtual app reference from %q: %s", cr.String(), err)
 			log.Error(err)
@@ -92,8 +95,8 @@ func Init(ctx context.Context, sess *session.Session, source extraconfig.DataSou
 
 		// Grab the AboutInfo about our host environment
 		about := sess.Vim25().ServiceContent.About
-		Config.VCHMhz = NCPU(ctx)
-		Config.VCHMemoryLimit = MemTotal(ctx)
+		Config.VCHMhz = NCPU(&op)
+		Config.VCHMemoryLimit = MemTotal(&op)
 		Config.HostOS = about.OsType
 		Config.HostOSVersion = about.Version
 		Config.HostProductName = about.Name
@@ -101,7 +104,7 @@ func Init(ctx context.Context, sess *session.Session, source extraconfig.DataSou
 		log.Debugf("VCH limits - %d Mhz, %d MB", Config.VCHMhz, Config.VCHMemoryLimit)
 
 		// sync container cache
-		if err = Containers.sync(ctx, sess); err != nil {
+		if err = Containers.sync(&op, sess); err != nil {
 			return
 		}
 	})
@@ -124,21 +127,24 @@ func eventCallback(ie events.Event) {
 				StateStopped,
 				StateSuspended:
 
+				newop := trace.NewOperation(context.Background(), "from background")
+				op, cancel := trace.WithTimeout(&newop, propertyCollectorTimeout, "refresh container from event")
+
 				log.Debugf("Container(%s) state set to %s via event activity",
 					container.ExecConfig.ID, newState.String())
 
-				container.SetState(newState)
+				container.SetState(&op, newState)
+
 				if newState == StateStopped {
-					container.onStop()
+					container.onStop(&op)
 				}
 
 				// container state has changed so we need to update the container attributes
 				// we'll do this in a go routine to avoid blocking
 				go func() {
-					ctx, cancel := context.WithTimeout(context.Background(), propertyCollectorTimeout)
 					defer cancel()
 
-					err := container.Refresh(ctx)
+					err := container.Refresh(&op)
 					if err != nil {
 						log.Errorf("Event driven container update failed: %s", err.Error())
 					}
