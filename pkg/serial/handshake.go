@@ -39,26 +39,28 @@ const (
 )
 
 // PurgeIncoming is used to clear a channel of bytes prior to handshaking
-func PurgeIncoming(conn net.Conn) {
+func PurgeIncoming(op *trace.Operation, conn net.Conn) {
 	if tracing {
-		defer trace.End(trace.Begin(""))
+		defer trace.End(trace.BeginOp(op, "purge incoming"))
 	}
 	buf := make([]byte, 255)
 
 	// read until the incoming channel is empty
 	conn.SetReadDeadline(time.Now().Add(time.Duration(10 * time.Millisecond)))
 	for n, err := conn.Read(buf); n != 0 || err == nil; n, err = conn.Read(buf) {
-		log.Debugf("discarding following %d bytes from input channel\n", n)
-		log.Debugf("%+v\n", buf[0:n])
+		op.Debugf("discarding following %d bytes from input channel", n)
+		if tracing {
+			log.Debugf("\n%+v\n", buf[0:n])
+		}
 	}
 
 	// disable the read timeout
 	conn.SetReadDeadline(time.Time{})
 }
 
-func HandshakeClient(ctx context.Context, conn net.Conn, debug bool) error {
+func HandshakeClient(op *trace.Operation, conn net.Conn, debug bool) error {
 	if tracing {
-		defer trace.End(trace.Begin(""))
+		defer trace.End(trace.BeginOp(op, "client handshake"))
 	}
 	syn := make([]byte, 2)
 	synack := make([]byte, 2)
@@ -72,7 +74,7 @@ func HandshakeClient(ctx context.Context, conn net.Conn, debug bool) error {
 
 	// set the read deadline for timeout
 	// this has no effect on windows as the deadline is set at port open time
-	deadline, ok := ctx.Deadline()
+	deadline, ok := op.Deadline()
 	if ok {
 		conn.SetReadDeadline(deadline)
 	}
@@ -89,9 +91,9 @@ func HandshakeClient(ctx context.Context, conn net.Conn, debug bool) error {
 
 		msg := fmt.Sprintf("HandshakeClient: failed to read expected SYN-ACK: n=%d, err=%s buf=[%#x]", n, err, buf[:n])
 		if err != nil {
-			log.Error(msg)
+			op.Error(msg)
 		} else {
-			log.Debug(msg)
+			op.Debug(msg)
 		}
 		return err
 	}
@@ -99,13 +101,13 @@ func HandshakeClient(ctx context.Context, conn net.Conn, debug bool) error {
 	synack[1] = syn[1] + 1
 	if bytes.Compare(synack, buf[:2]) != 0 {
 		msg := fmt.Sprintf("HandshakeClient: did not receive synack: %#x != %#x", synack, buf[:2])
-		log.Debugf(msg)
+		op.Debugf(msg)
 		conn.Write([]byte{flagNak})
 		return errors.New(msg)
 	}
 
-	log.Debugf("HandshakeClient: received synack: %#x == %#x\n", synack, buf[:2])
-	log.Debug("client: writing ack")
+	op.Debugf("HandshakeClient: received synack: %#x == %#x\n", synack, buf[:2])
+	op.Debug("client: writing ack")
 	ack[1] = buf[2] + 1
 	if debug {
 		ack[0] = flagDebugAck
@@ -120,33 +122,33 @@ func HandshakeClient(ctx context.Context, conn net.Conn, debug bool) error {
 		// of data to the container and it will echo it back.  Verify the sent and
 		// received bufs are the same and we know the channel is lossless.
 
-		log.Debugf("Checking for lossiness")
+		op.Debugf("Checking for lossiness")
 		txbuf := []byte("\x1b[32mhello world\x1b[39m!\n")
 		rxbuf := make([]byte, len(txbuf))
 
 		_, err := conn.Write(txbuf)
 		if err != nil {
-			log.Error(err)
+			op.Error(err)
 			return err
 		}
 
 		var n int
 		n, err = io.ReadFull(conn, rxbuf)
 		if err != nil {
-			log.Error(err)
+			op.Error(err)
 			return err
 		}
 
 		if n != len(rxbuf) {
 			err = fmt.Errorf("packet size mismatch (expected %d, received %d)", len(rxbuf), n)
-			log.Error(err)
+			op.Error(err)
 			return err
 		}
 
 		if bytes.Compare(rxbuf, txbuf) != 0 {
 			conn.Write([]byte{flagNak})
 			err = fmt.Errorf("client: lossiness check FAILED")
-			log.Error(err)
+			op.Error(err)
 			return err
 		}
 
@@ -155,7 +157,7 @@ func HandshakeClient(ctx context.Context, conn net.Conn, debug bool) error {
 			return err
 		}
 
-		log.Infof("client: lossiness check PASSED")
+		op.Infof("client: lossiness check PASSED")
 
 	}
 

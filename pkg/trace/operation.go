@@ -42,7 +42,7 @@ type operation struct {
 	id string
 }
 
-func newOperation(ctx context.Context, id string, skip int, msg string) Operation {
+func newOperation(ctx context.Context, id string, skip int, msg ...interface{}) Operation {
 	op := operation{
 
 		// Can be used to trace based on this number which is unique per chain
@@ -50,7 +50,7 @@ func newOperation(ctx context.Context, id string, skip int, msg string) Operatio
 		id: id,
 
 		// Start the trace.
-		t: []Message{*newTrace(skip, msg)},
+		t: []Message{*newTrace(skip, msg...)},
 	}
 
 	// We need to be able to identify this operation across API (and process)
@@ -114,25 +114,42 @@ func (o Operation) Err() error {
 	return nil
 }
 
-func (o *Operation) Warnf(format string, args ...interface{}) {
-	Logger.Warnf("%s: %s", o.header(), fmt.Sprintf(format, args...))
+func (o *Operation) Debugf(format string, args ...interface{}) {
+	Logger.Debugf("%s: %s", o.header(), fmt.Sprintf(format, args...))
 }
 
 func (o *Operation) Infof(format string, args ...interface{}) {
 	Logger.Infof("%s: %s", o.header(), fmt.Sprintf(format, args...))
 }
 
-func (o *Operation) Debugf(format string, args ...interface{}) {
-	Logger.Debugf("%s: %s", o.header(), fmt.Sprintf(format, args...))
+func (o *Operation) Warnf(format string, args ...interface{}) {
+	Logger.Warnf("%s: %s", o.header(), fmt.Sprintf(format, args...))
 }
 
 func (o *Operation) Errorf(format string, args ...interface{}) {
 	Logger.Errorf("%s: %s", o.header(), fmt.Sprintf(format, args...))
 }
 
-func (o *Operation) newChild(ctx context.Context, msg string) Operation {
-	child := newOperation(ctx, o.id, 4, msg)
+func (o *Operation) Debug(args ...interface{}) {
+	Logger.Debugf("%s: %s", o.header(), fmt.Sprint(args...))
+}
+
+func (o *Operation) Info(args ...interface{}) {
+	Logger.Infof("%s: %s", o.header(), fmt.Sprint(args...))
+}
+
+func (o *Operation) Warn(args ...interface{}) {
+	Logger.Warnf("%s: %s", o.header(), fmt.Sprint(args...))
+}
+
+func (o *Operation) Error(args ...interface{}) {
+	Logger.Errorf("%s: %s", o.header(), fmt.Sprint(args...))
+}
+
+func (o *Operation) newChild(ctx context.Context, msg ...interface{}) Operation {
+	child := newOperation(ctx, o.id, 4, msg...)
 	child.t = append(child.t, o.t...)
+
 	return child
 }
 
@@ -141,8 +158,8 @@ func opID(opNum uint64) string {
 }
 
 // Add tracing info to the context.
-func NewOperation(ctx context.Context, msg string) Operation {
-	o := newOperation(ctx, opID(atomic.AddUint64(&opCount, 1)), 3, msg)
+func NewOperation(ctx context.Context, msg ...interface{}) Operation {
+	o := newOperation(ctx, opID(atomic.AddUint64(&opCount, 1)), 3, msg...)
 
 	frame := o.t[0]
 	o.Debugf("[NewOperation] %s [%s:%d]: %s", o.header(), frame.funcName, frame.lineNo, msg)
@@ -150,17 +167,17 @@ func NewOperation(ctx context.Context, msg string) Operation {
 }
 
 // WithTimeout
-func WithTimeout(parent *Operation, timeout time.Duration, msg string) (Operation, context.CancelFunc) {
+func WithTimeout(parent *Operation, timeout time.Duration, msg ...interface{}) (Operation, context.CancelFunc) {
 	ctx, cancelFunc := context.WithTimeout(parent.Context, timeout)
-	op := parent.newChild(ctx, msg)
+	op := parent.newChild(ctx, msg...)
 
 	return op, cancelFunc
 }
 
 // WithDeadline
-func WithDeadline(parent *Operation, expiration time.Time, msg string) (Operation, context.CancelFunc) {
+func WithDeadline(parent *Operation, expiration time.Time, msg ...interface{}) (Operation, context.CancelFunc) {
 	ctx, cancelFunc := context.WithDeadline(parent.Context, expiration)
-	op := parent.newChild(ctx, msg)
+	op := parent.newChild(ctx, msg...)
 
 	return op, cancelFunc
 }

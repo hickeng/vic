@@ -15,20 +15,18 @@
 package attach
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"sync"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
-
 	"github.com/vmware/vic/pkg/errors"
 	"github.com/vmware/vic/pkg/serial"
 	"github.com/vmware/vic/pkg/trace"
 
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/net/context"
 )
 
 // Connection represents a communication channel initiated by the client TO the
@@ -57,7 +55,8 @@ type Connector struct {
 
 // On connect from a client (over TCP), attempt to SSH (over the same sock) to the client.
 func NewConnector(listener net.Listener, debug bool) *Connector {
-	defer trace.End(trace.Begin(""))
+	op := trace.NewOperation(context.Background())
+	defer trace.End(trace.BeginOp(&op, "new backchannel connector"))
 
 	connector := &Connector{
 		connections:  make(map[string]*Connection),
@@ -68,7 +67,7 @@ func NewConnector(listener net.Listener, debug bool) *Connector {
 	connector.cond = sync.NewCond(connector.mutex.RLocker())
 
 	connector.wg.Add(1)
-	go connector.serve()
+	go connector.serve(&op)
 
 	return connector
 }
@@ -76,10 +75,11 @@ func NewConnector(listener net.Listener, debug bool) *Connector {
 // Returns a connection corresponding to the specified ID. If the connection doesn't exist
 // the method will wait for the specified timeout, returning when the connection is created
 // or the timeout expires, whichever occurs first
-func (c *Connector) Get(ctx context.Context, id string, timeout time.Duration) (SessionInteraction, error) {
-	defer trace.End(trace.Begin(id))
+func (c *Connector) Get(op *trace.Operation, id string, timeout time.Duration) (SessionInteraction, error) {
+	defer trace.End(trace.BeginOp(op, "acquire connection with %s", id))
 
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	newop, cancel := trace.WithTimeout(op, timeout, "with timeout %s", timeout)
+	op = &newop
 	defer cancel()
 
 	c.mutex.RLock()
@@ -100,7 +100,7 @@ func (c *Connector) Get(ctx context.Context, id string, timeout time.Duration) (
 		c.mutex.RLock()
 		defer c.mutex.RUnlock()
 
-		for !ok && ctx.Err() == nil {
+		for !ok && op.Err() == nil {
 			conn, ok = c.connections[id]
 			if ok {
 				result <- conn
@@ -108,27 +108,27 @@ func (c *Connector) Get(ctx context.Context, id string, timeout time.Duration) (
 			}
 
 			// block until cond is updated
-			log.Infof("attach connector:  Connection not found yet for %s", id)
+			op.Infof("attach connector:  Connection not found yet for %s", id)
 			c.cond.Wait()
 		}
-		log.Debugf("attach connector:  Giving up on connection for %s", id)
+		op.Debugf("attach connector:  Giving up on connection for %s", id)
 	}()
 
 	select {
 	case client := <-result:
-		log.Debugf("attach connector: Found connection for %s: %p", id, client)
+		op.Debugf("attach connector: Found connection for %s: %p", id, client)
 		return client.spty, nil
-	case <-ctx.Done():
-		err := fmt.Errorf("attach connector: Connection not found error for id:%s: %s", id, ctx.Err())
-		log.Error(err)
+	case <-op.Done():
+		err := fmt.Errorf("attach connector: Connection not found error for id:%s: %s", id, op.Err())
+		op.Error(err)
 		// wake up the result gofunc before returning
 		c.cond.Broadcast()
 		return nil, err
 	}
 }
 
-func (c *Connector) Remove(id string) error {
-	defer trace.End(trace.Begin(id))
+func (c *Connector) Remove(op *trace.Operation, id string) error {
+	defer trace.End(trace.BeginOp(op, "remove connection: %s", id))
 
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -145,7 +145,9 @@ func (c *Connector) Remove(id string) error {
 }
 
 // takes the base connection, determines the ID of the source and stashes it in the map
-func (c *Connector) processIncoming(conn net.Conn) {
+func (c *Connector) processIncoming(op *trace.Operation, conn net.Conn) {
+	defer trace.End(trace.BeginOp(op, "process incomming connections"))
+
 	var err error
 	defer func() {
 		if err != nil && conn != nil {
@@ -155,11 +157,11 @@ func (c *Connector) processIncoming(conn net.Conn) {
 
 	for {
 		if conn == nil {
-			log.Infof("attach connector: connection closed")
+			op.Infof("attach connector: connection closed")
 			return
 		}
 
-		serial.PurgeIncoming(conn)
+		serial.PurgeIncoming(op, conn)
 
 		// TODO needs timeout handling.  This could take 30s.
 
@@ -167,13 +169,13 @@ func (c *Connector) processIncoming(conn net.Conn) {
 		// the tether side (in tether_linux.go) or alignment may not happen.
 		// The PL sends the first SYN in the handshake and if the tether is not
 		// waiting, the handshake may never succeed.
-		ctx, cancel := context.WithTimeout(context.TODO(), 50*time.Millisecond)
-		if err = serial.HandshakeClient(ctx, conn, c.debug); err == nil {
-			log.Debugf("attach connector: New connection")
+		newop, cancel := trace.WithTimeout(op, 50*time.Millisecond)
+		if err = serial.HandshakeClient(&newop, conn, c.debug); err == nil {
+			op.Debug("attach connector: New connection")
 			cancel()
 			break
 		} else if err == io.EOF {
-			log.Debugf("caught EOF")
+			op.Debug("caught EOF")
 			conn.Close()
 			return
 		}
@@ -188,7 +190,7 @@ func (c *Connector) processIncoming(conn net.Conn) {
 		HostKeyCallback: callback,
 	}
 
-	log.Debugf("Initiating ssh handshake with new connection attempt")
+	op.Debug("initiating ssh handshake with new connection attempt")
 	var (
 		ccon    ssh.Conn
 		newchan <-chan ssh.NewChannel
@@ -197,28 +199,28 @@ func (c *Connector) processIncoming(conn net.Conn) {
 
 	ccon, newchan, request, err = ssh.NewClientConn(conn, "", config)
 	if err != nil {
-		log.Errorf("SSH connection could not be established: %s", errors.ErrorStack(err))
+		op.Errorf("SSH connection could not be established: %s", errors.ErrorStack(err))
 		return
 	}
 
 	client := ssh.NewClient(ccon, newchan, request)
 
 	var ids []string
-	ids, err = SSHls(client)
+	ids, err = SSHls(op, client)
 	if err != nil {
-		log.Errorf("SSH connection could not be established: %s", errors.ErrorStack(err))
+		op.Errorf("SSH connection could not be established: %s", errors.ErrorStack(err))
 		return
 	}
 
 	var si SessionInteraction
 	for _, id := range ids {
-		si, err = SSHAttach(client, id)
+		si, err = SSHAttach(op, client, id)
 		if err != nil {
-			log.Errorf("SSH connection could not be established (id=%s): %s", id, errors.ErrorStack(err))
+			op.Errorf("SSH connection could not be established (id=%s): %s", id, errors.ErrorStack(err))
 			return
 		}
 
-		log.Infof("Established connection with container VM: %s", id)
+		op.Infof("Established connection with container VM: %s", id)
 
 		c.mutex.Lock()
 		connection := &Connection{
@@ -238,11 +240,11 @@ func (c *Connector) processIncoming(conn net.Conn) {
 // Starts the connector listening on the specified source
 // TODO: should have mechanism for stopping this, and probably handing off the connections to another
 // routine to insert into the map
-func (c *Connector) serve() {
+func (c *Connector) serve(op *trace.Operation) {
 	defer c.wg.Done()
 	for {
 		if c.listener == nil {
-			log.Debugf("attach connector: listener closed")
+			op.Debug("attach connector: listener closed")
 			break
 		}
 
@@ -250,18 +252,18 @@ func (c *Connector) serve() {
 
 		select {
 		case <-c.listenerQuit:
-			log.Debugf("attach connector: serve exitting")
+			op.Debug("attach connector: serve exitting")
 			return
 		default:
 		}
 
 		if err != nil {
-			log.Errorf("Error waiting for incoming connection: %s", errors.ErrorStack(err))
+			op.Errorf("Error waiting for incoming connection: %s", errors.ErrorStack(err))
 			continue
 		}
 
-		log.Info("attach connector: Received incoming connection")
-		go c.processIncoming(conn)
+		newop := trace.NewOperation(op, "new incoming connection")
+		go c.processIncoming(&newop, conn)
 	}
 }
 

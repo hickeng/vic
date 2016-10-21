@@ -30,8 +30,6 @@ const (
 )
 
 type SessionInteraction interface {
-	// Send specific signal
-	Signal(signal ssh.Signal) error
 	// Stdout stream
 	Stdout() io.Reader
 	// Stderr stream
@@ -53,8 +51,8 @@ type attachSSH struct {
 	requests <-chan *ssh.Request
 }
 
-func SSHls(client *ssh.Client) ([]string, error) {
-	defer trace.End(trace.Begin(""))
+func SSHls(op *trace.Operation, client *ssh.Client) ([]string, error) {
+	defer trace.End(trace.BeginOp(op, "list id on remote: %p", client))
 
 	ok, reply, err := client.SendRequest(msgs.ContainersReq, true, nil)
 	if !ok || err != nil {
@@ -73,8 +71,8 @@ func SSHls(client *ssh.Client) ([]string, error) {
 
 // SSHAttach returns a stream connection to the requested session
 // The ssh client is assumed to be connected to the Executor hosting the session
-func SSHAttach(client *ssh.Client, id string) (SessionInteraction, error) {
-	defer trace.End(trace.Begin(""))
+func SSHAttach(op *trace.Operation, client *ssh.Client, id string) (SessionInteraction, error) {
+	defer trace.End(trace.BeginOp(op, "open ssh channel to %s via %p", id, client))
 
 	sessionSSH := &attachSSH{
 		client: client,
@@ -94,27 +92,12 @@ func SSHAttach(client *ssh.Client, id string) (SessionInteraction, error) {
 		}
 	}()
 
+	op.Debugf("connection to %s: %p", id, sessionSSH)
 	return sessionSSH, nil
 }
 
-func (t *attachSSH) Signal(signal ssh.Signal) error {
-	defer trace.End(trace.Begin(""))
-
-	msg := msgs.SignalMsg{Signal: signal}
-	ok, err := t.channel.SendRequest(msgs.SignalReq, true, msg.Marshal())
-	if err == nil && !ok {
-		return fmt.Errorf("unknown error")
-	}
-
-	if err != nil {
-		return fmt.Errorf("signal error: %s", err)
-	}
-
-	return nil
-}
-
 func (t *attachSSH) CloseStdin() error {
-	defer trace.End(trace.Begin(""))
+	defer trace.End(trace.BeginOp(nil, "close stdin: %p", t))
 
 	ok, err := t.channel.SendRequest(msgs.CloseStdinReq, true, nil)
 	if err == nil && !ok {
@@ -129,32 +112,32 @@ func (t *attachSSH) CloseStdin() error {
 }
 
 func (t *attachSSH) Stdout() io.Reader {
-	defer trace.End(trace.Begin(""))
+	defer trace.End(trace.BeginOp(nil, "get stdout: %p", t))
 
 	return t.channel
 }
 
 func (t *attachSSH) Stderr() io.Reader {
-	defer trace.End(trace.Begin(""))
+	defer trace.End(trace.BeginOp(nil, "get stderr: %p", t))
 
 	return t.channel.Stderr()
 }
 
 func (t *attachSSH) Stdin() io.WriteCloser {
-	defer trace.End(trace.Begin(""))
+	defer trace.End(trace.BeginOp(nil, "get stdin: %p", t))
 
 	return t.channel
 }
 
 func (t *attachSSH) Close() error {
-	defer trace.End(trace.Begin(""))
+	defer trace.End(trace.BeginOp(nil, "close channel: %p", t))
 
 	return t.channel.Close()
 }
 
 // Resize resizes the terminal.
 func (t *attachSSH) Resize(cols, rows, widthpx, heightpx uint32) error {
-	defer trace.End(trace.Begin(""))
+	defer trace.End(trace.BeginOp(nil, "resize tty: %p", t))
 
 	msg := msgs.WindowChangeMsg{
 		Columns:  cols,

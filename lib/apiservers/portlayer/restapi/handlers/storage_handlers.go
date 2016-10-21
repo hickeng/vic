@@ -456,7 +456,7 @@ func (h *StorageHandlersImpl) VolumeJoin(params storage.VolumeJoinParams) middle
 
 	op := trace.NewOperation(context.Background(), fmt.Sprintf("VolumeJoin(%s)", params.Name))
 
-	actualHandle := epl.GetHandle(params.JoinArgs.Handle)
+	actualHandle := epl.GetHandle(nil, params.JoinArgs.Handle)
 
 	//Note: Name should already be populated by now.
 	volume, err := h.volumeCache.VolumeGet(op, params.Name)

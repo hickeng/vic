@@ -23,8 +23,8 @@ import (
 )
 
 // Join adds two file backed serial port and configures them
-func Join(h interface{}) (interface{}, error) {
-	defer trace.End(trace.Begin(""))
+func Join(op *trace.Operation, h interface{}) (interface{}, error) {
+	defer trace.End(trace.BeginOp(op, "logging join"))
 
 	handle, ok := h.(*exec.Handle)
 	if !ok {
@@ -66,15 +66,15 @@ func Join(h interface{}) (interface{}, error) {
 // TODO: We can't really toggle the logging ports so bind/unbind are NOOP
 
 // Bind sets the *Connected fields of the VirtualSerialPort
-func Bind(h interface{}) (interface{}, error) {
-	defer trace.End(trace.Begin(""))
+func Bind(op *trace.Operation, h interface{}) (interface{}, error) {
+	defer trace.End(trace.BeginOp(op, "logging bind"))
 
 	return h, nil
 }
 
 // Unbind unsets the *Connected fields of the VirtualSerialPort
-func Unbind(h interface{}) (interface{}, error) {
-	defer trace.End(trace.Begin(""))
+func Unbind(op *trace.Operation, h interface{}) (interface{}, error) {
+	defer trace.End(trace.BeginOp(op, "logging unbind"))
 
 	return h, nil
 }

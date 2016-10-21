@@ -166,7 +166,7 @@ func engageContext(ctx context.Context, netctx *Context, em event.EventManager) 
 		}
 	}()
 
-	op := trace.NewOperation(ctx, fmt.Sprintf("add containers for network"))
+	op := trace.NewOperation(ctx, "add containers for network")
 	for _, c := range exec.Containers.Containers(nil) {
 		op.Debugf("adding container %s", c.ExecConfig.ID)
 		h := c.NewHandle(&op)

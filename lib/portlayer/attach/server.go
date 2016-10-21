@@ -19,8 +19,6 @@ import (
 	"net"
 	"time"
 
-	"golang.org/x/net/context"
-
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/vmware/vic/lib/portlayer/constants"
@@ -87,14 +85,10 @@ func (n *Server) Addr() string {
 // Get returns the session interface for the given container.  If the container
 // cannot be found, this call will wait for the given timeout.
 // id is ID of the container.
-func (n *Server) Get(ctx context.Context, id string, timeout time.Duration) (SessionInteraction, error) {
-	defer trace.End(trace.Begin(id))
-
-	return n.connServer.Get(ctx, id, timeout)
+func (n *Server) Get(op *trace.Operation, id string, timeout time.Duration) (SessionInteraction, error) {
+	return n.connServer.Get(op, id, timeout)
 }
 
-func (n *Server) Remove(id string) error {
-	defer trace.End(trace.Begin(id))
-
-	return n.connServer.Remove(id)
+func (n *Server) Remove(op *trace.Operation, id string) error {
+	return n.connServer.Remove(op, id)
 }

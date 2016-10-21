@@ -169,7 +169,7 @@ func (handler *ScopesHandlersImpl) ScopesGetContainerEndpoints(params scopes.Get
 
 	cid := params.HandleOrID
 	// lookup by handle
-	h := exec.GetHandle(cid)
+	h := exec.GetHandle(nil, cid)
 	if h != nil {
 		cid = h.ExecConfig.ID
 	}
@@ -190,7 +190,7 @@ func (handler *ScopesHandlersImpl) ScopesGetContainerEndpoints(params scopes.Get
 func (handler *ScopesHandlersImpl) ScopesAddContainer(params scopes.AddContainerParams) middleware.Responder {
 	defer trace.End(trace.Begin(fmt.Sprintf("handle(%s)", params.Config.Handle)))
 
-	h := exec.GetHandle(params.Config.Handle)
+	h := exec.GetHandle(nil, params.Config.Handle)
 	if h == nil {
 		return scopes.NewAddContainerNotFound().WithPayload(&models.Error{Message: "container not found"})
 	}
@@ -233,7 +233,7 @@ func (handler *ScopesHandlersImpl) ScopesAddContainer(params scopes.AddContainer
 func (handler *ScopesHandlersImpl) ScopesRemoveContainer(params scopes.RemoveContainerParams) middleware.Responder {
 	defer trace.End(trace.Begin(fmt.Sprintf("handle(%s)", params.Handle)))
 
-	h := exec.GetHandle(params.Handle)
+	h := exec.GetHandle(nil, params.Handle)
 	if h == nil {
 		return scopes.NewRemoveContainerNotFound().WithPayload(&models.Error{Message: "container not found"})
 	}
@@ -252,7 +252,7 @@ func (handler *ScopesHandlersImpl) ScopesRemoveContainer(params scopes.RemoveCon
 func (handler *ScopesHandlersImpl) ScopesBindContainer(params scopes.BindContainerParams) middleware.Responder {
 	defer trace.End(trace.Begin(fmt.Sprintf("handle(%s)", params.Handle)))
 
-	h := exec.GetHandle(params.Handle)
+	h := exec.GetHandle(nil, params.Handle)
 	if h == nil {
 		return scopes.NewBindContainerNotFound().WithPayload(&models.Error{Message: "container not found"})
 	}
@@ -283,7 +283,7 @@ func (handler *ScopesHandlersImpl) ScopesBindContainer(params scopes.BindContain
 func (handler *ScopesHandlersImpl) ScopesUnbindContainer(params scopes.UnbindContainerParams) middleware.Responder {
 	defer trace.End(trace.Begin(fmt.Sprintf("handle(%s)", params.Handle)))
 
-	h := exec.GetHandle(params.Handle)
+	h := exec.GetHandle(nil, params.Handle)
 	if h == nil {
 		return scopes.NewUnbindContainerNotFound()
 	}

@@ -121,17 +121,16 @@ func eventCallback(ie events.Event) {
 		newState := eventedState(ie.String(), container.CurrentState())
 		// do we have a state change
 		if newState != container.CurrentState() {
+			newop := trace.NewOperation(context.Background(), "refresh container from event")
+			op, cancel := trace.WithTimeout(&newop, propertyCollectorTimeout, "with timeout")
+
 			switch newState {
 			case StateStopping,
 				StateRunning,
 				StateStopped,
 				StateSuspended:
 
-				newop := trace.NewOperation(context.Background(), "from background")
-				op, cancel := trace.WithTimeout(&newop, propertyCollectorTimeout, "refresh container from event")
-
-				log.Debugf("Container(%s) state set to %s via event activity",
-					container.ExecConfig.ID, newState.String())
+				op.Debugf("%s state set via event activity: %s ", container.ExecConfig.ID, newState.String())
 
 				container.SetState(&op, newState)
 
@@ -146,13 +145,13 @@ func eventCallback(ie events.Event) {
 
 					err := container.Refresh(&op)
 					if err != nil {
-						log.Errorf("Event driven container update failed: %s", err.Error())
+						op.Errorf("event driven container update failed: %s", err.Error())
 					}
 					// regardless of update success failure publish the container event
 					publishContainerEvent(container.ExecConfig.ID, ie.Created(), ie.String())
 				}()
 			case StateRemoved:
-				log.Debugf("Container(%s) %s via event activity", container.ExecConfig.ID, newState.String())
+				op.Debugf("%s removed via event activity", container.ExecConfig.ID)
 				Containers.Remove(container.ExecConfig.ID)
 				publishContainerEvent(container.ExecConfig.ID, ie.Created(), ie.String())
 
@@ -191,6 +190,8 @@ func eventedState(e string, current State) State {
 }
 
 // publishContainerEvent will publish a ContainerEvent to the vic event stream
+// TODO: adding a trace.Operation here will allow us to correlate the actions of
+// consumers of an event with the events origin
 func publishContainerEvent(id string, created time.Time, eventType string) {
 	if Config.EventManager == nil || eventType == "" {
 		return

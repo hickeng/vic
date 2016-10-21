@@ -131,7 +131,7 @@ func (h *Handle) SetTargetState(s State) {
 }
 
 // GetHandle finds and returns the handle that is referred by key
-func GetHandle(key string) *Handle {
+func getHandle(key string) *Handle {
 	handlesLock.Lock()
 	defer handlesLock.Unlock()
 
@@ -143,26 +143,30 @@ func GetHandle(key string) *Handle {
 }
 
 // HandleFromInterface returns the Handle
-func HandleFromInterface(key interface{}) *Handle {
-	defer trace.End(trace.Begin(""))
-
+func GetHandle(op *trace.Operation, key interface{}) *Handle {
 	if h, ok := key.(string); ok {
-		return GetHandle(h)
+		handle := getHandle(h)
+		if handle == nil {
+			op.Errorf("unknown key: %s", h)
+		}
+
+		return handle
 	}
 
-	log.Errorf("Type assertion failed for %#+v", key)
+	op.Errorf("type assertion failed for %#+v", key)
 	return nil
 }
 
 // ReferenceFromHandle returns the reference of the given handle
-func ReferenceFromHandle(handle interface{}) interface{} {
-	defer trace.End(trace.Begin(""))
+func ReferenceFromHandle(op *trace.Operation, handle interface{}) interface{} {
+	defer trace.End(trace.BeginOp(op, "handle serialization"))
 
 	if h, ok := handle.(*Handle); ok {
+		op.Debugf("reference: %s", h.String())
 		return h.String()
 	}
 
-	log.Errorf("Type assertion failed for %#+v", handle)
+	op.Errorf("Type assertion failed for %#+v", handle)
 	return nil
 }
 

@@ -61,7 +61,7 @@ func (t *Message) endHdr() string {
 }
 
 // begin a trace from this stack frame less the skip.
-func newTrace(skip int, format string, args ...interface{}) *Message {
+func newTrace(skip int, args ...interface{}) *Message {
 	pc, _, line, ok := runtime.Caller(skip)
 	if !ok {
 		return nil
@@ -70,16 +70,22 @@ func newTrace(skip int, format string, args ...interface{}) *Message {
 	name := runtime.FuncForPC(pc).Name()
 
 	t := &Message{
-		msg:       format,
 		funcName:  name,
 		lineNo:    line,
 		startTime: time.Now(),
 	}
 
-	if format != "" {
-		t.msg = fmt.Sprintf(format, args...)
+	if len(args) == 0 {
+		return t
 	}
 
+	format, ok := args[0].(string)
+	if ok {
+		t.msg = fmt.Sprintf(format, args[1:]...)
+		return t
+	}
+
+	t.msg = fmt.Sprint(args...)
 	return t
 }
 
@@ -96,10 +102,10 @@ func Begin(msg string) *Message {
 	return t
 }
 
-func BeginOp(op *Operation, format string, args ...interface{}) *Message {
-	t := newTrace(2, format, args...)
+func BeginOp(op *Operation, args ...interface{}) *Message {
+	t := newTrace(2, args...)
 
-	if format == "" {
+	if t.msg == "" {
 		op.Debugf(t.beginHdr())
 	} else {
 		op.Debugf("%s %s", t.beginHdr(), t.msg)

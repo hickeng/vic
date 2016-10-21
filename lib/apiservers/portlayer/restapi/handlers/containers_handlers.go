@@ -25,8 +25,6 @@ import (
 	middleware "github.com/go-swagger/go-swagger/httpkit/middleware"
 	"golang.org/x/net/context"
 
-	log "github.com/Sirupsen/logrus"
-
 	"net/http"
 
 	"github.com/vmware/vic/lib/apiservers/portlayer/models"
@@ -143,7 +141,7 @@ func (handler *ContainersHandlersImpl) CreateHandler(params containers.CreatePar
 
 // StateChangeHandler changes the state of a container
 func (handler *ContainersHandlersImpl) StateChangeHandler(params containers.StateChangeParams) middleware.Responder {
-	h := exec.GetHandle(params.Handle)
+	h := exec.GetHandle(nil, params.Handle)
 	if h == nil {
 		return containers.NewStateChangeNotFound()
 	}
@@ -172,7 +170,7 @@ func (handler *ContainersHandlersImpl) GetStateHandler(params containers.GetStat
 
 	// NOTE: I've no idea why GetStateHandler takes a handle instead of an ID - hopefully there was a reason for an inspection
 	// operation to take this path
-	h := exec.GetHandle(params.Handle)
+	h := exec.GetHandle(nil, params.Handle)
 	if h == nil || h.ExecConfig == nil {
 		return containers.NewGetStateNotFound()
 	}
@@ -220,9 +218,8 @@ func (handler *ContainersHandlersImpl) GetHandler(params containers.GetParams) m
 }
 
 func (handler *ContainersHandlersImpl) CommitHandler(params containers.CommitParams) middleware.Responder {
-	h := exec.GetHandle(params.Handle)
+	h := exec.GetHandle(nil, params.Handle)
 	if h == nil {
-		log.Errorf("handle not found: %s", params.Handle)
 		return containers.NewCommitNotFound().WithPayload(&models.Error{Message: "container not found"})
 	}
 
@@ -281,13 +278,13 @@ func (handler *ContainersHandlersImpl) RemoveContainerHandler(params containers.
 }
 
 func (handler *ContainersHandlersImpl) GetContainerInfoHandler(params containers.GetContainerInfoParams) middleware.Responder {
-	op := trace.NewOperation(context.Background(), fmt.Sprintf("container info: %s", params.ID))
+	op := trace.NewOperation(context.Background(), "container info: %s", params.ID)
 	defer trace.End(trace.BeginOp(&op, "container info: %s", params.ID))
 
 	container := exec.Containers.Container(params.ID)
 	if container == nil {
 		info := fmt.Sprintf("GetContainerInfoHandler ContainerCache miss for container(%s)", params.ID)
-		log.Error(info)
+		op.Errorf(info)
 		return containers.NewGetContainerInfoNotFound().WithPayload(&models.Error{Message: info})
 	}
 

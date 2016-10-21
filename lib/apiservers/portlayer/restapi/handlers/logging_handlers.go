@@ -23,7 +23,6 @@ import (
 
 	"github.com/vmware/vic/lib/portlayer/exec"
 	portlayer "github.com/vmware/vic/lib/portlayer/logging"
-	"github.com/vmware/vic/pkg/trace"
 )
 
 // LoggingHandlersImpl is the receiver for all of the logging handler methods
@@ -39,15 +38,14 @@ func (i *LoggingHandlersImpl) Configure(api *operations.PortLayerAPI, _ *Handler
 
 // JoinHandler calls the Join
 func (i *LoggingHandlersImpl) JoinHandler(params logging.LoggingJoinParams) middleware.Responder {
-	defer trace.End(trace.Begin(""))
-
-	handle := exec.HandleFromInterface(params.Config.Handle)
+	handle := exec.GetHandle(nil, params.Config.Handle)
 	if handle == nil {
 		err := &models.Error{Message: "Failed to get the Handle"}
 		return logging.NewLoggingJoinInternalServerError().WithPayload(err)
 	}
 
-	handleprime, err := portlayer.Join(handle)
+	op := handle.Operation
+	handleprime, err := portlayer.Join(op, handle)
 	if err != nil {
 		return logging.NewLoggingJoinInternalServerError().WithPayload(
 			&models.Error{Message: err.Error()},
@@ -55,22 +53,21 @@ func (i *LoggingHandlersImpl) JoinHandler(params logging.LoggingJoinParams) midd
 	}
 
 	res := &models.LoggingJoinResponse{
-		Handle: exec.ReferenceFromHandle(handleprime),
+		Handle: exec.ReferenceFromHandle(op, handleprime),
 	}
 	return logging.NewLoggingJoinOK().WithPayload(res)
 }
 
 // BindHandler calls the Bind
 func (i *LoggingHandlersImpl) BindHandler(params logging.LoggingBindParams) middleware.Responder {
-	defer trace.End(trace.Begin(""))
-
-	handle := exec.HandleFromInterface(params.Config.Handle)
+	handle := exec.GetHandle(nil, params.Config.Handle)
 	if handle == nil {
 		err := &models.Error{Message: "Failed to get the Handle"}
 		return logging.NewLoggingBindInternalServerError().WithPayload(err)
 	}
 
-	handleprime, err := portlayer.Bind(handle)
+	op := handle.Operation
+	handleprime, err := portlayer.Bind(op, handle)
 	if err != nil {
 		return logging.NewLoggingBindInternalServerError().WithPayload(
 			&models.Error{Message: err.Error()},
@@ -78,22 +75,21 @@ func (i *LoggingHandlersImpl) BindHandler(params logging.LoggingBindParams) midd
 	}
 
 	res := &models.LoggingBindResponse{
-		Handle: exec.ReferenceFromHandle(handleprime),
+		Handle: exec.ReferenceFromHandle(op, handleprime),
 	}
 	return logging.NewLoggingBindOK().WithPayload(res)
 }
 
 // UnbindHandler calls the Unbind
 func (i *LoggingHandlersImpl) UnbindHandler(params logging.LoggingUnbindParams) middleware.Responder {
-	defer trace.End(trace.Begin(""))
-
-	handle := exec.HandleFromInterface(params.Config.Handle)
+	handle := exec.GetHandle(nil, params.Config.Handle)
 	if handle == nil {
 		err := &models.Error{Message: "Failed to get the Handle"}
 		return logging.NewLoggingUnbindInternalServerError().WithPayload(err)
 	}
 
-	handleprime, err := portlayer.Unbind(handle)
+	op := handle.Operation
+	handleprime, err := portlayer.Unbind(op, handle)
 	if err != nil {
 		return logging.NewLoggingUnbindInternalServerError().WithPayload(
 			&models.Error{Message: err.Error()},
@@ -101,7 +97,7 @@ func (i *LoggingHandlersImpl) UnbindHandler(params logging.LoggingUnbindParams) 
 	}
 
 	res := &models.LoggingUnbindResponse{
-		Handle: exec.ReferenceFromHandle(handleprime),
+		Handle: exec.ReferenceFromHandle(op, handleprime),
 	}
 	return logging.NewLoggingUnbindOK().WithPayload(res)
 }
