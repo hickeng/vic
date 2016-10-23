@@ -54,7 +54,7 @@ if [ ! -z "$*" -o -z "$PACKAGE" ]; then
 fi
 
 # prep the build system
-ensure_apt_packages cpio rpm tar ca-certificates
+ensure_apt_packages cpio rpm tar ca-certificates fakeroot
 
 PKGDIR=$(mktemp -d)
 
@@ -62,10 +62,11 @@ PKGDIR=$(mktemp -d)
 initialize_bundle $PKGDIR
 
 # base filesystem setup
-mkdir -p $(rootfs_dir $PKGDIR)/{etc/yum,etc/yum.repos.d}
-ln -s /lib $(rootfs_dir $PKGDIR)/lib64
-cp $DIR/base/*.repo $(rootfs_dir $PKGDIR)/etc/yum.repos.d/
-cp $DIR/base/yum.conf $(rootfs_dir $PKGDIR)/etc/yum/
+rootfs_cmd $PKGDIR mkdir -p {etc/yum,etc/yum.repos.d}
+rootfs_cmd $PKGDIR ln -s /lib lib64
+rootfs_cmd $PKGDIR cp $DIR/base/*.repo etc/yum.repos.d/
+rootfs_cmd $PKGDIR cp $DIR/base/yum.conf etc/yum/
+
 
 # install the core packages
 yum_cached -c $cache -u -p $PKGDIR install filesystem coreutils linux-esx --nogpgcheck -y
@@ -73,7 +74,7 @@ yum_cached -c $cache -u -p $PKGDIR install filesystem coreutils linux-esx --nogp
 yum_cached -c $cache -p $PKGDIR clean all
 
 # move kernel into bootfs /boot directory so that syslinux could load it
-mv $(rootfs_dir $PKGDIR)/boot/vmlinuz-esx-* $(bootfs_dir $PKGDIR)/boot/vmlinuz64
+rootfs_cmd $PKGDIR mv boot/vmlinuz-esx-* $(bootfs_dir $PKGDIR)/boot/vmlinuz64
 
 # package up the result
 pack $PKGDIR $PACKAGE

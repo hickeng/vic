@@ -65,49 +65,42 @@ unpack $PACKAGE $PKGDIR
 
 ## systemd configuration
 # create systemd vic target
-cp ${DIR}/appliance/vic.target $(rootfs_dir $PKGDIR)/etc/systemd/system/
-cp ${DIR}/appliance/vic-init.service $(rootfs_dir $PKGDIR)/etc/systemd/system/
-cp ${DIR}/appliance/nat.service $(rootfs_dir $PKGDIR)/etc/systemd/system/
-cp ${DIR}/appliance/nat-setup $(rootfs_dir $PKGDIR)/etc/systemd/scripts
+rootfs_cmd $PKGDIR cp ${DIR}/appliance/vic.target etc/systemd/system/
+rootfs_cmd $PKGDIR cp ${DIR}/appliance/vic-init.service etc/systemd/system/
+rootfs_cmd $PKGDIR cp ${DIR}/appliance/nat.service etc/systemd/system/
+rootfs_cmd $PKGDIR cp ${DIR}/appliance/nat-setup etc/systemd/scripts
 
-mkdir -p $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants
-ln -s /etc/systemd/system/vic-init.service $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants/
-ln -s /etc/systemd/system/nat.service $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants/
-ln -s /etc/systemd/system/multi-user.target $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants/
+rootfs_cmd $PKGDIR mkdir -p etc/systemd/system/vic.target.wants
+rootfs_cmd $PKGDIR ln -s /etc/systemd/system/vic-init.service etc/systemd/system/vic.target.wants/
+rootfs_cmd $PKGDIR ln -s /etc/systemd/system/nat.service etc/systemd/system/vic.target.wants/
+rootfs_cmd $PKGDIR ln -s /etc/systemd/system/multi-user.target etc/systemd/system/vic.target.wants/
 
 # disable networkd given we manage the link state directly
-rm -f $(rootfs_dir $PKGDIR)/etc/systemd/system/multi-user.target.wants/systemd-networkd.service
-rm -f $(rootfs_dir $PKGDIR)/etc/systemd/system/sockets.target.wants/systemd-networkd.socket
+rootfs_cmd $PKGDIR rm -f etc/systemd/system/multi-user.target.wants/systemd-networkd.service
+rootfs_cmd $PKGDIR rm -f etc/systemd/system/sockets.target.wants/systemd-networkd.socket
 
 # change the default systemd target to launch VIC
-ln -sf /etc/systemd/system/vic.target $(rootfs_dir $PKGDIR)/etc/systemd/system/default.target
-# update the multi-user target to launch VIC - this launches sshd as well
-#ln -s /etc/systemd/system/vic.target $(rootfs_dir $PKGDIR)/etc/systemd/system/multi-user.target.wants/vic.target
+rootfs_cmd $PKGDIR ln -sf /etc/systemd/system/vic.target etc/systemd/system/default.target
 
 # do not use the systemd dhcp client
-rm -f $(rootfs_dir $PKGDIR)/etc/systemd/network/*
-cp ${DIR}/base/no-dhcp.network $(rootfs_dir $PKGDIR)/etc/systemd/network/
+rootfs_cmd $PKGDIR rm -f etc/systemd/network/*
+rootfs_cmd $PKGDIR cp ${DIR}/base/no-dhcp.network etc/systemd/network/
 
 # do not use the default iptables rules - nat-setup supplants this
-rm -f $(rootfs_dir $PKGDIR)/etc/systemd/network/*
+rootfs_cmd $PKGDIR rm -f etc/systemd/network/*
 
-#
-# Set up vicadmin user
-#
-
-chroot $(rootfs_dir $PKGDIR) groupadd -g 1000 vicadmin
-chroot $(rootfs_dir $PKGDIR) useradd -u 1000 -g 1000 -G systemd-journal -m -d /home/vicadmin -s /bin/false vicadmin
-cp -R ${DIR}/vicadmin/* $(rootfs_dir $PKGDIR)/home/vicadmin
-chown -R 1000:1000 $(rootfs_dir $PKGDIR)/home/vicadmin
+# populate the vic-admin assets
+rootfs_cmd $PKGDIR cp -R ${DIR}/vicadmin/* home/vicadmin
+rootfs_cmd $PKGDIR chown -R 1000:1000 home/vicadmin
 # so vicadmin can read the system journal via journalctl
-install -m 755 -d $(rootfs_dir $PKGDIR)/etc/tmpfiles.d
+rootfs_cmd $PKGDIR install -m 755 -d etc/tmpfiles.d
 echo "m  /var/log/journal/%m/system.journal 2755 root systemd-journal - -" > $(rootfs_dir $PKGDIR)/etc/tmpfiles.d/systemd.conf
 
 ## main VIC components
 # tether based init
-cp ${BIN}/vic-init $(rootfs_dir $PKGDIR)/sbin/vic-init
+rootfs_cmd $PKGDIR cp ${BIN}/vic-init sbin/vic-init
 
-cp ${BIN}/{docker-engine-server,port-layer-server,vicadmin} $(rootfs_dir $PKGDIR)/sbin/
+rootfs_cmd $PKGDIR cp ${BIN}/{docker-engine-server,port-layer-server,vicadmin} sbin/
 
 echo "net.ipv4.ip_forward = 1" > $(rootfs_dir $PKGDIR)/usr/lib/sysctl.d/50-vic.conf
 

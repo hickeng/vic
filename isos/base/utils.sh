@@ -27,13 +27,13 @@ VERSION=`git describe --abbrev=0 --tags`-${BUILD_NUMBER}-`git rev-parse --short 
 # initialize a directory with the assumptions we make for authoring
 # 1: target directory
 initialize_bundle() {
-    mkdir -p $1
+    fakeroot mkdir -p $1
     sed -e "s/\${VERSION}/${VERSION}/" $BASE_DIR/xorriso-options.cfg > $1/xorriso-options.cfg
 
-    mkdir -p $1/rootfs/var/lib/rpm $1/bootfs/boot
+    fakeroot mkdir -p $1/rootfs/var/lib/rpm $1/bootfs/boot
 
-    rpm --root=$1/rootfs --initdb
-    cp -a $BASE_DIR/isolinux $1/bootfs/boot/isolinux
+    fakeroot rpm --root=$1/rootfs --initdb
+    fakeroot cp -a $BASE_DIR/isolinux $1/bootfs/boot/isolinux
 }
 
 # unpackage working ISO filesystem bundle
@@ -46,7 +46,7 @@ unpack() {
         return 1
     }
 
-    tar -C $2 -xf $1 || {
+    fakeroot tar -C $2 -xf $1 || {
         echo "Error extracting package archive $1: $?" 1>&2
         return 2
     }
@@ -95,7 +95,7 @@ pack() {
     out=$(readlink -f $2)
     (
         cd $1
-        tar -zcf $out rootfs bootfs xorriso* || {
+        fakeroot tar -zcf $out rootfs bootfs xorriso* || {
             echo "Failed to package bundle directory: $?" 1>&2
             return 1
         }
@@ -178,7 +178,7 @@ ensure_apt_packages() {
 
     # ensure we've got the utils we need
     for pkg in "$@"; do
-        dpkg -s $pkg || install="$install $pkg"
+        dpkg -s $pkg > /dev/null || install="$install $pkg"
     done
 
     if [ -n "$install" ]; then
@@ -231,14 +231,14 @@ generate_iso() {
             return 3
         }
         # set the init binary in isolinux.cfg
-        sed -i -e "s|^#\(\s*append rdinit\)=_INIT_BINARY_|\1=$3|" bootfs/boot/isolinux/isolinux.cfg || {
+        fakeroot sed -i -e "s|^#\(\s*append rdinit\)=_INIT_BINARY_|\1=$3|" bootfs/boot/isolinux/isolinux.cfg || {
             echo "Unable to update rdinit entry in isolinux.cfg: $?" 1>&2
             return 4
         }
 
         # create the initramfs archive - subshell to avoid changing directory
         echo "Constructing initramfs archive"
-        ( cd rootfs && find | cpio -o -H newc | gzip --fast ) > bootfs/boot/core.gz || {
+        ( cd rootfs && find | cpio -o -H newc | gzip --fast ) > bootfs/boot/core.gz && fakeroot chown root:root bootfs/boot/core.gz || {
             echo "Failed to package root filesystem from $1/rootfs: $?" 1>&2
             return 5
         }
@@ -247,7 +247,7 @@ generate_iso() {
         rm -f "$out"
 
         # generate the ISO and write it to $ISOOUT
-        xorriso -dev "$out" -options_from_file xorriso-options.cfg || {
+        fakeroot xorriso -dev "$out" -options_from_file xorriso-options.cfg || {
             echo "Failed to generate ISO file from package: $?" 1>&2
             return 6
         }
@@ -329,7 +329,7 @@ yum_cached() {
 
     # repack cache
     if [ -n "$update" -a -n "${cache}" -a -d ${INSTALLROOT}/var/cache/yum ]; then
-        tar -C ${INSTALLROOT} -zcf $cache var/cache/yum
+        fakeroot tar -C ${INSTALLROOT} -zcf $cache var/cache/yum
     fi
 }
 
@@ -348,7 +348,7 @@ rootfs_cmd() {
         cmd=$1
         shift 1
 
-        $cmd "$@" || return $?
+        fakeroot $cmd $@ || return $?
     )
 }
 

@@ -25,8 +25,6 @@ no-tls () {
 
 unset-vic () {
     unset MAPPED_NETWORKS NETWORKS IMAGE_STORE DATASTORE COMPUTE VOLUME_STORES IPADDR GOVC_INSECURE TLS THUMBPRINT
-    unset DOCKER_CERT_PATH DOCKER_TLS_VERIFY
-    unalias docker 2>/dev/null
 }
 
 vic-path () {
@@ -34,9 +32,14 @@ vic-path () {
 }
 
 vic-create () {
-    pushd $(vic-path)/bin/
+    base=$(pwd)
+    (
+        cd $(vic-path)/bin
+        $(vic-path)/bin/vic-machine-"$OS" create --target="$GOVC_URL" --image-store="$IMAGE_STORE" --compute-resource="$COMPUTE" "${TLS[@]}" ${TLS_OPTS} --name=${VIC_NAME:-${USER}test} "${MAPPED_NETWORKS[@]}" "${VOLUME_STORES[@]}" "${NETWORKS[@]}" ${IPADDR} ${TIMEOUT} --thumbprint=$THUMBPRINT $*
+    )
 
-    $(vic-path)/bin/vic-machine-"$OS" create --target="$GOVC_URL" --image-store="$IMAGE_STORE" --compute-resource="$COMPUTE" "${TLS[@]}" ${TLS_OPTS} --name=${VIC_NAME:-${USER}test} "${MAPPED_NETWORKS[@]}" "${VOLUME_STORES[@]}" "${NETWORKS[@]}" ${IPADDR} ${TIMEOUT} --thumbprint=$THUMBPRINT $*
+    unset DOCKER_CERT_PATH DOCKER_TLS_VERIFY
+    unalias docker 2>/dev/null
 
     envfile=${VIC_NAME:-${USER}test}/${VIC_NAME:-${USER}test}.env
     if [ -f "$envfile" ]; then
@@ -45,11 +48,12 @@ vic-create () {
         set +a
     fi
 
+    # This doesn't work for --no-tls
     if [ -z ${DOCKER_TLS_VERIFY+x} ]; then
         alias docker='docker --tls'
     fi
 
-    popd
+    cd $base
 }
 
 vic-delete () {
@@ -93,24 +97,24 @@ addr-from-dockerhost () {
 # example entry, actived by typing "example"
 # those variales that hold mulitple arguements which may contain spaces are arrays to allow for proper quoting
 #example () {
-#    target='https://user:password@host.domain.com/datacenter'
 #    unset-vic
 #
-#    export GOVC_URL=$target
+#    export GOVC_URL='https://user:password@host.domain.com/datacenter'
 #
 #    eval "export THUMBPRINT=$(govc about.cert -k -json | jq -r .ThumbprintSHA1)"
 #    export COMPUTE=cluster/pool
 #    export DATASTORE=datastore1
 #    export IMAGE_STORE=$DATASTORE/image/path
-#    NETWORKS=("--bridge-network=private-dpg-vlan" "--external-network=extern-dpg")
-#    MAPPED_NETWORKS=("--container-network=VM Network:external" "--container-network=SomeOtherNet:elsewhere")
-#    VOLUME_STORES=("--volume-store=$DATASTORE:default")
-#    export TLS=("--tls-cname=vch-hostname.domain.com" "--organisation=MyCompany")
 #    export TIMEOUT="--timeout=10m"
 #    export IPADDR="--client-network-ip=vch-hostname.domain.com --client-network-gateway=x.x.x.x/22 --dns-server=y.y.y.y --dns-server=z.z.z.z"
 #    export VIC_NAME="MyVCH"
 #
-#    export NETWORKS MAPPED_NETWORKS VOLUME_STORES
+#    NETWORKS=("--bridge-network=private-dpg-vlan" "--external-network=extern-dpg")
+#    MAPPED_NETWORKS=("--container-network=VM Network:external" "--container-network=SomeOtherNet:elsewhere")
+#    VOLUME_STORES=("--volume-store=$DATASTORE:default")
+#    TLS=("--tls-cname=vch-hostname.domain.com" "--organisation=MyCompany")
+#
+#    export NETWORKS MAPPED_NETWORKS VOLUME_STORES TLS
 #}
 
 . ~/.vic

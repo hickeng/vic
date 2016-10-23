@@ -73,29 +73,29 @@ unpack $package $PKGDIR
 #selecting the init script as our entry point.
 if [ -v debug ]; then
     export ISONAME="bootstrap-debug.iso"
-    cp ${DIR}/bootstrap/bootstrap.debug $(rootfs_dir $PKGDIR)/bin/bootstrap
-    cp ${BIN}/rpctool $(rootfs_dir $PKGDIR)/sbin/
+    rootfs_cmd ${PKGDIR} cp ${DIR}/bootstrap/bootstrap.debug bin/bootstrap
+    rootfs_cmd ${PKGDIR} cp ${BIN}/rpctool sbin/
 else
     export ISONAME="bootstrap.iso"
-    cp ${DIR}/bootstrap/bootstrap $(rootfs_dir $PKGDIR)/bin/bootstrap
+    rootfs_cmd ${PKGDIR} cp ${DIR}/bootstrap/bootstrap bin/bootstrap
 fi
 
 # copy in our components
-cp ${BIN}/tether-linux $(rootfs_dir $PKGDIR)/bin/tether
+rootfs_cmd ${PKGDIR} cp ${BIN}/tether-linux bin/tether
 
 # kick off our components at boot time
-mkdir -p $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants
-cp ${DIR}/bootstrap/tether.service $(rootfs_dir $PKGDIR)/etc/systemd/system/
-cp ${DIR}/appliance/vic.target $(rootfs_dir $PKGDIR)/etc/systemd/system/
-ln -s /etc/systemd/system/tether.service $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants/
-ln -sf /etc/systemd/system/vic.target $(rootfs_dir $PKGDIR)/etc/systemd/system/default.target
+rootfs_cmd ${PKGDIR} mkdir -p etc/systemd/system/vic.target.wants
+rootfs_cmd ${PKGDIR} cp ${DIR}/bootstrap/tether.service etc/systemd/system/
+rootfs_cmd ${PKGDIR} cp ${DIR}/appliance/vic.target etc/systemd/system/
+rootfs_cmd ${PKGDIR} ln -s /etc/systemd/system/tether.service etc/systemd/system/vic.target.wants/
+rootfs_cmd ${PKGDIR} ln -sf /etc/systemd/system/vic.target etc/systemd/system/default.target
 
 # disable networkd given we manage the link state directly
-rm -f $(rootfs_dir $PKGDIR)/etc/systemd/system/multi-user.target.wants/systemd-networkd.service
-rm -f $(rootfs_dir $PKGDIR)/etc/systemd/system/sockets.target.wants/systemd-networkd.socket
+rootfs_cmd ${PKGDIR} rm -f etc/systemd/system/multi-user.target.wants/systemd-networkd.service
+rootfs_cmd ${PKGDIR} rm -f etc/systemd/system/sockets.target.wants/systemd-networkd.socket
 
 # do not use the systemd dhcp client
-rm -f $(rootfs_dir $PKGDIR)/etc/systemd/network/*
-cp ${DIR}/base/no-dhcp.network $(rootfs_dir $PKGDIR)/etc/systemd/network/
+rootfs_cmd ${PKGDIR} rm -f etc/systemd/network/*
+rootfs_cmd ${PKGDIR} cp ${DIR}/base/no-dhcp.network etc/systemd/network/
 
 generate_iso $PKGDIR $BIN/$ISONAME /lib/systemd/systemd

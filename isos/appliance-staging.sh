@@ -124,5 +124,11 @@ sed -i -e "s/\#*PermitRootLogin\s.*/PermitRootLogin yes/" $(rootfs_dir $PKGDIR)/
 # Disable root login
 sed -i -e 's@:/bin/bash$@:/bin/false@' $(rootfs_dir $PKGDIR)/etc/passwd
 
+#
+# Set up vicadmin user
+#
+chroot $(rootfs_dir $PKGDIR) groupadd -g 1000 vicadmin
+chroot $(rootfs_dir $PKGDIR) useradd -u 1000 -g 1000 -G systemd-journal -m -d /home/vicadmin -s /bin/false vicadmin
+
 # package up the result
 pack $PKGDIR $OUT
