@@ -35,6 +35,8 @@ GOLINT ?= $(GOPATH)/bin/golint$(BIN_ARCH)
 GVT ?= $(GOPATH)/bin/gvt$(BIN_ARCH)
 GOVC ?= $(GOPATH)/bin/govc$(BIN_ARCH)
 GAS ?= $(GOPATH)/bin/gas$(BIN_ARCH)
+UPX ?= /usr/bin/upx
+
 
 .PHONY: all tools clean test check \
 	goversion goimports gopath govet gas golint \
@@ -251,20 +253,25 @@ endif
 
 $(vic-init): $$(call godeps,cmd/vic-init/*.go)
 	@echo building vic-init
-	@CGO_ENABLED=1 GOOS=linux GOARCH=amd64 $(GO) build $(RACE) -tags netgo -installsuffix netgo -o ./$@ ./$(dir $<)
+	@CGO_ENABLED=1 GOOS=linux GOARCH=amd64 $(GO) build $(RACE) -tags netgo -installsuffix netgo -o $(@).orig ./$(dir $<)
+	@$(TIME) $(UPX) -o $@ $(@).orig
 
 $(tether-linux): $$(call godeps,cmd/tether/*.go)
 	@echo building tether-linux
-	@CGO_ENABLED=1 GOOS=linux GOARCH=amd64 $(TIME) $(GO) build $(RACE) -tags netgo -installsuffix netgo -ldflags '-extldflags "-static"' -o ./$@ ./$(dir $<)
+	@CGO_ENABLED=1 GOOS=linux GOARCH=amd64 $(TIME) $(GO) build $(RACE) -tags netgo -installsuffix netgo -ldflags '-extldflags "-static"' -o $(@).orig ./$(dir $<)
+	@$(TIME) $(UPX) -o $@ $(@).orig
+
 
 $(tether-windows): $$(call godeps,cmd/tether/*.go)
 	@echo building tether-windows
-	@CGO_ENABLED=1 GOOS=windows GOARCH=amd64 $(TIME) $(GO) build $(RACE) -tags netgo -installsuffix netgo -ldflags '-extldflags "-static"' -o ./$@ ./$(dir $<)
+	@CGO_ENABLED=1 GOOS=windows GOARCH=amd64 $(TIME) $(GO) build $(RACE) -tags netgo -installsuffix netgo -ldflags '-extldflags "-static"' -o $(@).orig ./$(dir $<)
+	@$(TIME) $(UPX) -o $@ $(@).orig
 
 # CGO is disabled for darwin otherwise build fails with "gcc: error: unrecognized command line option '-mmacosx-version-min=10.6'"
 $(tether-darwin): $$(call godeps,cmd/tether/*.go)
 	@echo building tether-darwin
-	@CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(TIME) $(GO) build $(RACE) -tags netgo -installsuffix netgo -ldflags '-extldflags "-static"' -o ./$@ ./$(dir $<)
+	@CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(TIME) $(GO) build $(RACE) -tags netgo -installsuffix netgo -ldflags '-extldflags "-static"' -o $(@).orig ./$(dir $<)
+	@$(TIME) $(UPX) -o $@ $(@).orig
 
 $(rpctool): $$(call godeps,cmd/rpctool/*.go)
 ifeq ($(OS),linux)
@@ -276,12 +283,15 @@ endif
 
 $(vicadmin): $$(call godeps,cmd/vicadmin/*.go)
 	@echo building vicadmin
-	@GOARCH=amd64 GOOS=linux $(TIME) $(GO) build $(RACE) $(ldflags) -o ./$@ ./$(dir $<)
+	@GOARCH=amd64 GOOS=linux $(TIME) $(GO) build $(RACE) $(ldflags) -o $(@).orig ./$(dir $<)
+	@$(TIME) $(UPX) -o $@ $(@).orig
+
 
 $(docker-engine-api): $$(call godeps,cmd/docker/*.go) $(portlayerapi-client)
 ifeq ($(OS),linux)
 	@echo Building docker-engine-api server...
-	@$(TIME) $(GO) build $(RACE) $(ldflags) -o $@ ./cmd/docker
+	@$(TIME) $(GO) build $(RACE) $(ldflags) -o $(@).orig ./$(dir $<)
+	@$(TIME) $(UPX) -o $@ $(@).orig
 else
 	@echo skipping docker-engine-api server, cannot build on non-linux
 endif
@@ -302,7 +312,8 @@ $(portlayerapi-server): $(PORTLAYER_DEPS) $(SWAGGER)
 
 $(portlayerapi): $$(call godeps,cmd/port-layer-server/*.go) $(portlayerapi-server) $(portlayerapi-client)
 	@echo building Portlayer API server...
-	@$(TIME) $(GO) build $(RACE) $(ldflags) -o $@ ./cmd/port-layer-server
+	@$(TIME) $(GO) build $(RACE) $(ldflags) -o $(@).orig ./cmd/port-layer-server
+	@$(TIME) $(UPX) -o $@ $(@).orig
 
 $(iso-base): isos/base.sh isos/base/*.repo isos/base/isolinux/** isos/base/xorriso-options.cfg
 	@echo building iso-base docker image
@@ -337,39 +348,40 @@ $(bootstrap-staging-debug): isos/bootstrap-staging.sh $(iso-base)
 
 $(vic-machine-linux): $$(call godeps,cmd/vic-machine/*.go)
 	@echo building vic-machine linux...
-	@GOARCH=amd64 GOOS=linux $(TIME) $(GO) build $(RACE) $(ldflags) -o ./$@ ./$(dir $<)
+	@GOARCH=amd64 GOOS=linux $(TIME) $(GO) build $(RACE) $(ldflags) -o $(@).orig ./$(dir $<)
+	@$(TIME) $(UPX) -o $@ $(@).orig
 
 $(vic-machine-windows): $$(call godeps,cmd/vic-machine/*.go)
 	@echo building vic-machine windows...
-	@GOARCH=amd64 GOOS=windows $(TIME) $(GO) build $(RACE) $(ldflags) -o ./$@ ./$(dir $<)
+	@GOARCH=amd64 GOOS=windows $(TIME) $(GO) build $(RACE) $(ldflags) -o $@ ./$(dir $<)
 
 $(vic-machine-darwin): $$(call godeps,cmd/vic-machine/*.go)
 	@echo building vic-machine darwin...
-	@GOARCH=amd64 GOOS=darwin $(TIME) $(GO) build $(RACE) $(ldflags) -o ./$@ ./$(dir $<)
+	@GOARCH=amd64 GOOS=darwin $(TIME) $(GO) build $(RACE) $(ldflags) -o $@ ./$(dir $<)
 
 $(vic-ui-linux): $$(call godeps,cmd/vic-ui/*.go)
 	@echo building vic-ui linux...
-	@GOARCH=amd64 GOOS=linux $(TIME) $(GO) build $(RACE) -ldflags "-X main.BuildID=${BUILD_NUMBER} -X main.CommitID=${COMMIT}" -o ./$@ ./$(dir $<)
+	@GOARCH=amd64 GOOS=linux $(TIME) $(GO) build $(RACE) -ldflags "-X main.BuildID=${BUILD_NUMBER} -X main.CommitID=${COMMIT}" -o $@ ./$(dir $<)
 
 $(vic-ui-windows): $$(call godeps,cmd/vic-ui/*.go)
 	@echo building vic-ui windows...
-	@GOARCH=amd64 GOOS=windows $(TIME) $(GO) build $(RACE) -ldflags "-X main.BuildID=${BUILD_NUMBER} -X main.CommitID=${COMMIT}" -o ./$@ ./$(dir $<)
+	@GOARCH=amd64 GOOS=windows $(TIME) $(GO) build $(RACE) -ldflags "-X main.BuildID=${BUILD_NUMBER} -X main.CommitID=${COMMIT}" -o $@ ./$(dir $<)
 
 $(vic-ui-darwin): $$(call godeps,cmd/vic-ui/*.go)
 	@echo building vic-ui darwin...
-	@GOARCH=amd64 GOOS=darwin $(TIME) $(GO) build $(RACE) -ldflags "-X main.BuildID=${BUILD_NUMBER} -X main.CommitID=${COMMIT}" -o ./$@ ./$(dir $<)
+	@GOARCH=amd64 GOOS=darwin $(TIME) $(GO) build $(RACE) -ldflags "-X main.BuildID=${BUILD_NUMBER} -X main.CommitID=${COMMIT}" -o $@ ./$(dir $<)
 
 $(vic-dns-linux): $$(call godeps,cmd/vic-dns/*.go)
 	@echo building vic-dns linux...
-	@GOARCH=amd64 GOOS=linux $(TIME) $(GO) build $(RACE) $(ldflags) -o ./$@ ./$(dir $<)
+	@GOARCH=amd64 GOOS=linux $(TIME) $(GO) build $(RACE) $(ldflags) -o $@ ./$(dir $<)
 
 $(vic-dns-windows): $$(call godeps,cmd/vic-dns/*.go)
 	@echo building vic-dns windows...
-	@GOARCH=amd64 GOOS=windows $(TIME) $(GO) build $(RACE) $(ldflags) -o ./$@ ./$(dir $<)
+	@GOARCH=amd64 GOOS=windows $(TIME) $(GO) build $(RACE) $(ldflags) -o $@ ./$(dir $<)
 
 $(vic-dns-darwin): $$(call godeps,cmd/vic-dns/*.go)
 	@echo building vic-dns darwin...
-	@GOARCH=amd64 GOOS=darwin $(TIME) $(GO) build $(RACE) $(ldflags) -o ./$@ ./$(dir $<)
+	@GOARCH=amd64 GOOS=darwin $(TIME) $(GO) build $(RACE) $(ldflags) -o $@ ./$(dir $<)
 
 clean:
 	@rm -rf $(BIN)/*
