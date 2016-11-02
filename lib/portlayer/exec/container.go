@@ -293,9 +293,15 @@ func (c *Container) RefreshFromHandle(ctx context.Context, h *Handle) {
 	c.m.Lock()
 	defer c.m.Unlock()
 
-	if c.Config != nil && (h.Config == nil || h.Config.ChangeVersion != c.Config.ChangeVersion) {
-		log.Warnf("container and handle ChangeVersions do not match: %s != %s", c.Config.ChangeVersion, h.Config.ChangeVersion)
-		return
+	if c.Config != nil {
+		if h.Config == nil {
+			log.Warnf("cannot refresh from handle with nil Config")
+			return
+		}
+		if h.Config.ChangeVersion != c.Config.ChangeVersion {
+			log.Warnf("container and handle ChangeVersions do not match: %s != %s", c.Config.ChangeVersion, h.Config.ChangeVersion)
+			return
+		}
 	}
 
 	// copy over the new state

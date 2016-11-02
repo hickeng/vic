@@ -29,7 +29,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/vmware/govmomi/vim25/types"
 	"github.com/vmware/vic/lib/config/executor"
 	"github.com/vmware/vic/lib/system"
 	"github.com/vmware/vic/lib/tether"
@@ -214,18 +213,6 @@ func RunTether(t *testing.T, cfg *executor.ExecutorConfig) (tether.Tether, extra
 	erR := tthr.Start()
 
 	return tthr, src, erR
-}
-
-func OptionValueArrayToString(options []types.BaseOptionValue) string {
-	// create the key/value store from the extraconfig slice for lookups
-	kv := make(map[string]string)
-	for i := range options {
-		k := options[i].GetOptionValue().Key
-		v := options[i].GetOptionValue().Value.(string)
-		kv[k] = v
-	}
-
-	return fmt.Sprintf("%#v", kv)
 }
 
 func testSetup(t *testing.T) {

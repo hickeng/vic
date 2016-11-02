@@ -25,7 +25,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 
-	"github.com/vmware/vic/lib/config"
+	"github.com/vmware/vic/lib/config/executor"
 	"github.com/vmware/vic/pkg/vsphere/extraconfig"
 )
 
@@ -42,7 +42,7 @@ const (
 )
 
 var (
-	vchConfig config.VirtualContainerHostConfigSpec
+	executorConfig executor.ExecutorConfig
 )
 
 func init() {
@@ -53,7 +53,7 @@ func init() {
 		log.Errorf("Unable to load configuration from guestinfo")
 		return
 	}
-	extraconfig.Decode(src, &vchConfig)
+	extraconfig.Decode(src, &executorConfig)
 }
 
 func GetPprofEndpoint(component PprofPort) *url.URL {
@@ -65,7 +65,7 @@ func GetPprofEndpoint(component PprofPort) *url.URL {
 	ip := "127.0.0.1"
 	// exposing this data on an external port definitely counts as a change of behaviour,
 	// so this is > 1, just debug on/off.
-	if vchConfig.ExecutorConfig.Diagnostics.DebugLevel > 1 {
+	if executorConfig.Diagnostics.DebugLevel > 1 {
 		ips, err := net.LookupIP("client.localhost")
 		if err != nil || len(ips) == 0 {
 			log.Warnf("Unable to resolve 'client.localhost': ", err)
