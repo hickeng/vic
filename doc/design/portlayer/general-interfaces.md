@@ -1,0 +1,115 @@
+# Canditate components
+
+The following are candidates for components.A component:
+* has knowledge of how to provide a specific resource
+* manages distinct elements of that resource
+
+
+Facets required to start a container:
+* Execution environment - slicable basic compute capabilities
+  * ESX, vCenter, Linux, Windows
+* Executor - sliced portion of environment - isolation mechanism
+  * VM, process, namespace
+* Loader - mechanism for initialization of an Executor, if needed
+  * bootstrap.iso, direct boot, customer-bootstrap.iso
+
+
+
+# Component interface
+
+```go
+type Component interface {
+    // Is the filterspec a per component "language" or something common
+    // between them?
+    //
+    // Should this allow for general "uses X" queries? When trying to delete an image for example
+    // the storage component isn't necessary going to be able to tell that a disk is in use by container X.
+    // If we can query exec for "uses image I" then the caller can determine what is blocking deletion.
+    List(filterspec interface{})
+
+    Events
+
+    Diagnostics
+}
+
+type Events interface {
+    // Is this filterspec the same "language" as for List? (presuming common language between components)
+    Events(filterspec interface{}) <-chan Event
+
+    // No idea whether there should be separate calls for async vs sync, inline trigger, allowing the aspect
+    // to mutate state, etc.
+    Trigger(filterspec interface{}, aspect(Event))
+}
+
+type Diagnostics {
+    // Operations that are currently in progress
+    //   - not sure if this is worth the data management overhead - implies need for collation and tracking
+    InProgress
+
+    // Query errors
+    //  * time range
+    //  * error type
+    //  * target elements
+    //  * ...
+    Errors(filterspec ???)
+
+    // Return logs
+    // * time range
+    // * operation ID
+    // * errors
+    // - or just text files and size limit?
+    Log(filterspec ???)
+}
+```
+
+# Commit
+
+The entire port layer should be as close to idempotent as viable, with exceptions _clearly_ documented. The downside of that is that people commonly use success or failure of racing operations to determine where follow on work happens and an idempotent model can invalidate the underlying assumptions of that approach.
+
+Example - power on.
+
+Actor1: power on X  # succeeds
+Actor2: power on X  # succeeds in idempotent case, fails otherwise
+
+As such we should consider identifying which portions of a change actually altered state:
+
+```go
+type CommitStatus int8
+const (
+    // Successfully applied change
+    COMMIT_SUCCESS CommitStatus = iota
+    // Failed to apply change
+    COMMIT_ERROR
+    // Change is a noop
+    COMMIT_NOOP
+)
+
+type Result interface {
+    // were there any errors in the result
+    IsError()   bool
+    // result per element
+    Results()  map[ID]CommitStatus
+    // detail messages
+    Detail()   map[ID]string
+}
+
+type interface Commit {
+    Commit (handle Handle) Result
+}
+```
+
+
+# Errors
+
+The following are some general errors that could occur:
+
+vmomi errors (should be moved to vmomi gateway, but needs to be such that can be passed through the components):
+ * connection failure
+ * authentication failure
+ * authorization error
+ * vsphere system error
+
+runtime errors:
+ * tether should report status of element initialization
+ * failure messages should be actionable, or informative
+ * error status for an element should be such that it can be mapped back to the element ID
