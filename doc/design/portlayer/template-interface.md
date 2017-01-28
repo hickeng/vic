@@ -1,11 +1,11 @@
-# Executor
+# <Template>
 
-The executor component deals with construction of the slicing mechanism for the underlying environment. In the case of vSphere that is a VM.
+The <template> component deals with ...
 
-## Executor - configuration
+## <Template> - configuration
 
 
-## Executor - element management
+## <Template> - element management
 
 ```go
 // semi structured identifier
@@ -13,9 +13,9 @@ The executor component deals with construction of the slicing mechanism for the 
 //  * ID - identifier within it's store
 typedef ID url.URL
 
-// Descripor for a Executor element
+// Descripor for a <template> element
 // should implement interface(s) required for filtering
-type Executor struct {
+type <Template> struct {
     id          ID
     parentID    ID                      // optional
     roBlob      map[string][]byte
@@ -24,37 +24,33 @@ type Executor struct {
 }
 
 
-type Executor interface {
-    // Creates a new Executor element
+type <Template> interface {
+    // Creates a new <template> element
     //  * ID - encodes both location/store in which to create it and the name by which it's addressed
     //  * parentID -
-    //  * data - additional files to copy into created executor
     //  * roUser - caller specific metadata that is immutable once created
     //  * rwUser - caller specific metadata that can be updated - keys must not exist in the roUser set
     //
-    Create(id ID, parentID ID, data io.ReadCloser, checksum string, roUser map[string][]byte, rwUser map[string][]byte) (Executor, error)
+    Create(id ID, parentID ID, roUser map[string][]byte, rwUser map[string][]byte) (<Template>, error)
 
     // Should provide options to control whether this returns:
-    //  * data - should allow for copy of files from executor
-    //         - should provide checksum in result
     //  * rwUser/roUser/attributes
     //         - should allow caller to specify only portions of metadata to return
     //         - should return all user data and attributes by default
-    Read(id ID, filterspec ???) (Executor, error)
+    Read(id ID, filterspec ???) (<Template>, error)
 
     // Updates the various modifiable aspects of the element
     //  * ID must exist
     //  * can only be updated if location policy allows writing - applies to data and rwUser data
-    //  * data - additional files to copy into created executor - copy approach depends on state of executor
     //  * rwUser data - if the value of a key is nil it will be deleted from the store
-    Update(id ID, data io.ReadCloser, checksum string, rwUser map[string][]byte) error
+    Update(id ID, rwUser map[string][]byte) error
 
     // Deletes all aspects of this element, including the implementation assocaited metadata and user ro/rw metadata
     Delete(id ID) error
 }
 ```
 
-## Executor - element management errors
+## <Template> - element management errors
 
 **Create** - ID
  * unknown location
@@ -64,13 +60,6 @@ type Executor interface {
 **Create** - ParentID
  * unknown parent - id not found
  * invalid parent - provided ID cannot be used as parent
-
-**Create** -  Data/checksum
- * unsupported checksum algorithm
- * unsupported data format
- * invalid data - does not match provided checksum
- * data error - e.g. error from data reader
- * insufficient space
 
 **Create** - roUser & rwUser
  * invalid entry - does not allow nil values, or key (or value) violates kv store constraints
@@ -85,21 +74,12 @@ type Executor interface {
 **Read** - filterspec
  * invalid spec
 
-**Read** -  Data/checksum
- * file not found - no matching file in executor
 
 
 **Update** - ID
  * unknown location
  * id not found in location
  * invalid location - e.g. read-only or create only
-
-**Create** -  Data/checksum
- * unsupported checksum algorithm
- * unsupported data format
- * invalid data - does not match provided checksum
- * data error - e.g. error from data reader
- * insufficient space
 
 **Update** - roUser & rwUser
  * invalid entry - does not allow nil values, or key (or value) violates kv store constraints
@@ -113,12 +93,12 @@ type Executor interface {
  * invalid location - e.g. read-only or create only
 
 **Delete** - Invalid states
- * in use - could provide list of referencing IDs (guess this would be Executor IDs only)
+ * in use - could provide list of referencing IDs (guess this would be <template> IDs only)
  * permission denied (if we have sub-location permissions)
 
 
 
-## Executor - events
+## <Template> - events
 
 Possible event set:
 * created
@@ -127,7 +107,7 @@ Possible event set:
 * inherited
 
 
-## Executor - composition
+## <Template> - composition
 
 
 ```go
@@ -159,5 +139,3 @@ type Composition interface {
 
 ## Questions and acceptance criteria:
 
-* How do we do live copy?
-* How do we do offline copy?

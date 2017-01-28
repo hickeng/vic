@@ -1,9 +1,17 @@
-# Canditate components
+# Candidate components
 
 The following are candidates for components.A component:
 * has knowledge of how to provide a specific resource
 * manages distinct elements of that resource
 
+
+Questions:
+* how is power on/off done?
+* how is suspend resume done?
+* can the API style phrase services?
+* can the API style handle pass-through devices, e.g. GPGPU
+* how are affinity constraints phrased? do they need to be present at creation time or usage time?
+* are scopes and stores the same conceptual construct?
 
 Facets required to start a container:
 * Execution environment - slicable basic compute capabilities
@@ -12,8 +20,47 @@ Facets required to start a container:
   * VM, process, namespace
 * Loader - mechanism for initialization of an Executor, if needed
   * bootstrap.iso, direct boot, customer-bootstrap.iso
+* Linker - provides access to data sources/sinks
+  * volume mounts, networks, etc
+* Logic - the environment required by a task
+  * filesystem, executable
+* Task - invocation of a Logic
+  * working dir, env vars, process arguments, credentials, 
 
 
+
+Current:
+logic - storage.Join
+task - exec.Join
+loader - not selectable
+executor - not selectable, can configure memory/cpu
+linker - volume.Join/network.Join/logging.Join/interaction.Join
+execution env - exec.ChangeState
+
+
+# Policy
+
+We may need to be able to supply policy at creation time, composition, or usage time.
+
+Questions:
+* should policy be associated with scopes/stores?
+* should policy be associated with the memebership of a scope/store? i.e. per-element during Join
+  * policy could be the pairing of a filterspec with a constraint (read-only, anti-afinity, allowed, denied, etc)
+    - if the constraint is unknown, cannot be satisfied or interpreted given existing policy then it's an error
+    - filter spec could be used to specify outgoing target in the case of open network scopes
+
+Scopes/Stores allow:
+* create, write
+* priority/shares
+* affinity
+
+Exposed ports:
+* may be associated with a specific scope
+  * if a contianer is in a scope then it may connect to any exposed ports in the scope
+
+Initiating connections:
+* only a concern on open scopes (bridge, container-networks)
+  * container may define permitted outgoing target (tcp: address/port, ip:address, ether:mac, etc)
 
 # Component interface
 
@@ -25,6 +72,8 @@ type Component interface {
     // Should this allow for general "uses X" queries? When trying to delete an image for example
     // the storage component isn't necessary going to be able to tell that a disk is in use by container X.
     // If we can query exec for "uses image I" then the caller can determine what is blocking deletion.
+    //
+    // Default filterspec should hide _infrastructure_ elements (system.hidden, system.infrastructure tags? system.type=hidden?)
     List(filterspec interface{})
 
     Events
