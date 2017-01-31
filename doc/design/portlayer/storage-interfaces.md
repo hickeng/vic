@@ -25,6 +25,13 @@ These are storage locations such as the volume stores and image stores that we c
   * Permissions (create, read, write)
   * Encryption
 
+To allow for different usage/policy while storing data in the same "physical" location, it should be possible to have multiple storage locations
+referencing the same datastore path. For example (these are port layer configuration, rather than specific vic-machine options, or user operations):
+
+```go
+"vmdk://datastore1/myvch"  // data written to this location should be unpacked into a vmdk packaging (vmdk named based on id)
+"file://datastore1/myvch"  // data written to this location should be unpacked directly into datastore path (into directory named based on id)
+```
 
 ## Storage - element management
 

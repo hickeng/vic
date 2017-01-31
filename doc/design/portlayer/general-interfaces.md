@@ -81,6 +81,10 @@ type Component interface {
     // Default filterspec should hide _infrastructure_ elements (system.hidden, system.infrastructure tags? system.type=hidden?)
     List(filterspec interface{})
 
+    // Unsure about this one - while there needs to be a way to provide mocked configuration to the components
+    // is that best left as an implementation detail rather than specified here?
+    Configure(config interface{})
+
     Events
 
     Diagnostics

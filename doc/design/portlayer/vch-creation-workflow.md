@@ -25,6 +25,14 @@ This is a worked example of VCH creation, via self-hosted portlayer, to validate
 * upload loaders
   * direct boot
   * bootstrap
+  * vmfork
+
+* create vmfork template
+  * vNIC hot add, or on bridge network?
+  * should this be created by vic-machine or endpoint?
+  * tagged as <parent> and <hidden>
+  * how do we configure endpoint to use this as parent?
+    - should it be a failure if this isn't available for use?
 
 * create endpoint
   * loader: direct boot
