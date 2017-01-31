@@ -1,23 +1,27 @@
 # Candidate components
 
-The following are candidates for components.A component:
+The following are candidates for components. A component:
 * has knowledge of how to provide a specific resource
 * manages distinct elements of that resource
 
 
 Questions:
+* task cancellation/addressing CDE
+
 * how is power on/off done?
 * how is suspend resume done?
+  * Join a hibernation mechanism to add capability. Bind/Unbind to suspend/resume.
 * can the API style phrase services?
 * can the API style handle pass-through devices, e.g. GPGPU
 * how are affinity constraints phrased? do they need to be present at creation time or usage time?
 * are scopes and stores the same conceptual construct?
 
+
 Facets required to start a container:
 * Execution environment - slicable basic compute capabilities
   * ESX, vCenter, Linux, Windows
 * Executor - sliced portion of environment - isolation mechanism
-  * VM, process, namespace
+  * VM, process, namespace/cgroup
 * Loader - mechanism for initialization of an Executor, if needed
   * bootstrap.iso, direct boot, customer-bootstrap.iso
 * Linker - provides access to data sources/sinks
@@ -43,6 +47,7 @@ execution env - exec.ChangeState
 We may need to be able to supply policy at creation time, composition, or usage time.
 
 Questions:
+* how, exactly, are NIOC & SIOC specified
 * should policy be associated with scopes/stores?
 * should policy be associated with the memebership of a scope/store? i.e. per-element during Join
   * policy could be the pairing of a filterspec with a constraint (read-only, anti-afinity, allowed, denied, etc)
@@ -110,6 +115,30 @@ type Diagnostics {
     Log(filterspec ???)
 }
 ```
+
+
+# Composition interface
+
+```go
+  type Composer {
+    // Adds a capability.
+    //
+    // Adds to the handle to allow for later activation. If different variants are needed
+    // for different operating systems or environments, then this should supply all off the variations
+    // tagged such that a singluar variant can be chosen by Commit.
+    Join(handle Handle, id ID, ...)
+
+    // Activates a capability. If id is omitted, activiates all elements relating
+    // to this component.
+    // Arguments supply details as to _how_ this capability presents
+    Bind(handle Handle, id ID, ...)
+
+    // Deactivates a capability.
+    Unbind(handle Handle, id ID)
+
+    // Removes a capability
+    Leave(handle Handle, id ID)
+  }
 
 # Commit
 

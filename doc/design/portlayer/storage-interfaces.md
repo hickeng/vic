@@ -183,6 +183,8 @@ type Composition interface {
 
     // id - the specific element to do second stage processing on. Optional.
     //    - if not specified then all elements managed by the component will be processed
+    //
+    // Should we allow mounting of device as file if trailing / is ommitted?
     Bind(handle Handle, id ID, ...?) (Handle, error)
 
     // id - the specific element to do undo second stage processing on. Optional.
