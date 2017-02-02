@@ -104,6 +104,11 @@ type Diagnostics {
     //   - not sure if this is worth the data management overhead - implies need for collation and tracking
     InProgress
 
+    // Provides details about performance statics
+    // 
+    // This could be a separate interface
+    Statistics(filterspec ???)
+
     // Query errors
     //  * time range
     //  * error type
@@ -124,7 +129,7 @@ type Diagnostics {
 # Composition interface
 
 ```go
-  type Composer {
+  type Compose {
     // Adds a capability.
     //
     // Adds to the handle to allow for later activation. If different variants are needed
@@ -143,6 +148,7 @@ type Diagnostics {
     // Removes a capability
     Leave(handle Handle, id ID)
   }
+```
 
 # Commit
 
