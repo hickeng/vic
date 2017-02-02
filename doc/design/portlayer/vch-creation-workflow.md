@@ -21,9 +21,11 @@ This is a worked example of VCH creation, via self-hosted portlayer, to validate
     * confirm ownership in policy file
 * create/adopt bridge network fabric (e.g. DPG)
   * don't know where ownership is recorded
+  
 
 * upload loaders
   * direct boot
+    * with associated extra VMX options needed
   * bootstrap
   * vmfork
 
@@ -60,6 +62,7 @@ Configure vmPL (vic-machine portlayer) with:
 
 ```go
 // create the direct boot loader
+// NOTE: must provide the direct boot extra VMX options
 s1, err := storage.Create(<infra-raw/direct-boot>, "", <tar of direct boot pieces>, checksum, 0, <capabilities>, <requirements>, <rometa>, <rwmeta>)
 // create the rootfs image with endpoint binaries
 s2, err := storage.Create(<infra/endpoint-image>, "", <Reader to appliance image>), checksum, 0, <rometa>, <rwmeta>)
@@ -134,13 +137,30 @@ h = task.Bind(h, t3, <logging>, "/working/dir",credentials)
 
 
 
+## Specific deployment example
+
+
+### Resources to assign to VCH:
+
+Target resource pool: /clusterA/poolB/
+
+Management network:   networkA
+Public network:       vmNet
+Bridge network:       dpg-bridgeNet
+Client network:       vmNet
+Container network:    vmNet
+
+Volume store:         datastore1/volumes
+Volume store:         nfs.server.com/volumes
+
+Image store:          datastore2/images
+Infra store:          datastore2/infra
 
 
 
-
-
-
-
+Steps:
+* Create/adopt volume store at datastore1/volumes
+* Create/adopt volume store at nfs.server.com/volumes
 
 
 
