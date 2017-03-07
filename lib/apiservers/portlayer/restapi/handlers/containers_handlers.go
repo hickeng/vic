@@ -61,6 +61,11 @@ func (handler *ContainersHandlersImpl) Configure(api *operations.PortLayerAPI, h
 	api.ContainersGetContainerLogsHandler = containers.GetContainerLogsHandlerFunc(handler.GetContainerLogsHandler)
 	api.ContainersContainerWaitHandler = containers.ContainerWaitHandlerFunc(handler.ContainerWaitHandler)
 
+	api.ContainersCreateExecHandler = containers.CreateExecHandlerFunc(handler.CreateExecHandler)
+	api.ContainersExecStartHandler = containers.ExecStartHandlerFunc(handler.ExecStartHandler)
+	api.ContainersExecResizeHandler = containers.ExecResizeHandlerFunc(handler.ExecResizeHandler)
+	api.ContainersExecInspectHandler = containers.ExecInspectHandlerFunc(handler.ExecInspectHandler)
+
 	handler.handlerCtx = handlerCtx
 }
 
@@ -148,6 +153,54 @@ func (handler *ContainersHandlersImpl) CreateHandler(params containers.CreatePar
 
 	//  send the container id back to the caller
 	return containers.NewCreateOK().WithPayload(&models.ContainerCreatedInfo{ID: id, Handle: h.String()})
+}
+
+func (handler *ContainersHandlersImpl) CreateExecHandler(params containers.CreateExecParams) middleware.Responder {
+	defer trace.End(trace.Begin(""))
+
+	// FIXME(caglar10ur)
+	id := uid.New().String()
+
+	log.Warnf("CreateExecConfig: %#v", params.CreateExecConfig)
+
+	return containers.NewCreateExecOK().WithPayload(
+		&models.ContainerExecCreateResponse{
+			ID:     id,
+			Handle: "Handle",
+		},
+	)
+}
+
+func (handler *ContainersHandlersImpl) ExecStartHandler(params containers.ExecStartParams) middleware.Responder {
+	defer trace.End(trace.Begin(""))
+
+	// FIXME(caglar10ur)
+	log.Warnf("ExecStartParams: %#v", params.StartExecConfig)
+
+	return containers.NewExecStartOK()
+}
+
+func (handler *ContainersHandlersImpl) ExecResizeHandler(params containers.ExecResizeParams) middleware.Responder {
+	defer trace.End(trace.Begin(""))
+
+	log.Warnf("ExecResizeParams: %#v", params)
+
+	return containers.NewExecResizeOK()
+}
+
+func (handler *ContainersHandlersImpl) ExecInspectHandler(params containers.ExecInspectParams) middleware.Responder {
+	defer trace.End(trace.Begin(""))
+
+	// FIXME(caglar10ur)
+	id := uid.New().String()
+
+	log.Warnf("ExecInspectParams: %#v", params)
+
+	return containers.NewExecInspectOK().WithPayload(
+		&models.ExecInspectResponse{
+			ID: id,
+		},
+	)
 }
 
 // StateChangeHandler changes the state of a container

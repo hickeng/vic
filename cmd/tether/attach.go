@@ -386,10 +386,13 @@ func (t *attachServerSSH) run() error {
 			sessionid := string(bytes)
 			session, ok := t.config.Sessions[sessionid]
 			if !ok {
-				detail := fmt.Sprintf("session %s is invalid", sessionid)
-				attachchan.Reject(ssh.Prohibited, detail)
-				log.Error(detail)
-				continue
+				session, ok = t.config.Execs[sessionid]
+				if !ok {
+					detail := fmt.Sprintf("session %s is invalid", sessionid)
+					attachchan.Reject(ssh.Prohibited, detail)
+					log.Error(detail)
+					continue
+				}
 			}
 
 			channel, requests, err := attachchan.Accept()
@@ -476,9 +479,13 @@ func (t *attachServerSSH) globalMux(reqchan <-chan *ssh.Request) {
 
 		switch req.Type {
 		case msgs.ContainersReq:
-			keys := make([]string, len(t.config.Sessions))
+			keys := make([]string, len(t.config.Sessions)+len(t.config.Execs))
 			i := 0
 			for k := range t.config.Sessions {
+				keys[i] = k
+				i++
+			}
+			for k := range t.config.Execs {
 				keys[i] = k
 				i++
 			}

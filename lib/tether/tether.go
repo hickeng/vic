@@ -250,7 +250,6 @@ func (t *tether) setMounts() error {
 }
 
 func (t *tether) initializeSessions() error {
-
 	maps := map[string]map[string]*SessionConfig{
 		"Sessions": t.config.Sessions,
 		"Execs":    t.config.Execs,
@@ -276,17 +275,28 @@ func (t *tether) initializeSessions() error {
 					session.ClearToLaunch = make(chan struct{})
 				}
 
-				stdout, stderr, err := t.ops.SessionLog(session)
-				if err != nil {
-					detail := fmt.Errorf("failed to get log writer for session: %s", err)
-					session.Started = detail.Error()
-
-					return detail
+				// sanity check
+				if id != session.ID {
+					log.Errorf("Session.ID does not match session map key, updating session.ID locally: %s != %s", session.ID, id)
+					session.ID = id
 				}
-				session.Outwriter = stdout
-				session.Errwriter = stderr
-				session.Reader = dio.MultiReader()
 
+				if name == "Sessions" {
+					stdout, stderr, err := t.ops.SessionLog(session)
+					if err != nil {
+						detail := fmt.Errorf("failed to get log writer for session: %s", err)
+						session.Started = detail.Error()
+
+						return detail
+					}
+					session.Outwriter = stdout
+					session.Errwriter = stderr
+					session.Reader = dio.MultiReader()
+				} else {
+					session.Outwriter = dio.MultiWriter(os.Stdout)
+					session.Errwriter = dio.MultiWriter(os.Stderr)
+					session.Reader = dio.MultiReader()
+				}
 				session.wait = &sync.WaitGroup{}
 				session.extraconfigKey = name
 
@@ -322,16 +332,10 @@ func (t *tether) processSessions() error {
 	// so that we can launch multiple sessions in parallel
 	var wg sync.WaitGroup
 	// to collect the errors back from them
-	resultsCh := make(chan results, len(t.config.Sessions))
+	resultsCh := make(chan results, len(t.config.Sessions)+len(t.config.Execs))
 
-	maps := []map[string]*SessionConfig{
-		t.config.Sessions,
-		t.config.Execs,
-	}
-
-	// we need to iterate over both sessions and execs
-	for _, m := range maps {
-		// process the sessions and launch if needed
+	// process the sessions and launch if needed
+	for _, m := range []map[string]*SessionConfig{t.config.Sessions, t.config.Execs} {
 		for id, session := range m {
 			session.Lock()
 
@@ -366,8 +370,6 @@ func (t *tether) processSessions() error {
 				} else {
 					session.Diagnostics.ResurrectionCount++
 
-					// FIXME: we cannot have this embedded knowledge of the extraconfig encoding pattern, but not
-					// currently sure how to expose it neatly via a utility function
 					extraconfig.EncodeWithPrefix(t.sink, session, extraconfig.CalculateKeys(t.config, fmt.Sprintf("%s.%s", session.extraconfigKey, id), "")[0])
 					log.Warnf("Re-launching process for session %s (count: %d)", id, session.Diagnostics.ResurrectionCount)
 					session.Cmd = *restartableCmd(&session.Cmd)
@@ -630,9 +632,7 @@ func (t *tether) launch(session *SessionConfig) error {
 
 	// Write the PID to the associated PID file
 	cmdname := path.Base(session.Cmd.Path)
-	err = ioutil.WriteFile(fmt.Sprintf("%s.pid", path.Join(PIDFileDir(), cmdname)),
-		[]byte(fmt.Sprintf("%d", pid)),
-		0644)
+	err = ioutil.WriteFile(fmt.Sprintf("%s.pid", path.Join(PIDFileDir(), cmdname)), []byte(fmt.Sprintf("%d", pid)), 0644)
 	if err != nil {
 		log.Errorf("Unable to write PID file for %s: %s", cmdname, err)
 	}

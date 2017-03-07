@@ -1122,8 +1122,7 @@
 				"produces": [
 					"application/octet-stream"
 				],
-				"parameters": [
-				],
+				"parameters": [],
 				"responses": {
 					"200": {
 						"description": "OK",
@@ -1520,6 +1519,223 @@
 				}
 			}
 		},
+		"/containers/{id}/exec": {
+			"post": {
+				"description": "Initiates an exec create operation",
+				"summary": "Initiates an exec create operation",
+				"operationId": "CreateExec",
+				"tags": [
+					"containers"
+				],
+				"consumes": [
+					"application/json",
+					"application/octet-stream"
+				],
+				"produces": [
+					"application/json"
+				],
+				"parameters": [
+					{
+						"name": "id",
+						"required": true,
+						"in": "path",
+						"type": "string"
+					},
+					{
+						"name": "createExecConfig",
+						"in": "body",
+						"required": true,
+						"schema": {
+							"$ref": "#/definitions/ContainerCreateExecConfig"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"schema": {
+							"$ref": "#/definitions/ContainerExecCreateResponse"
+						}
+					},
+					"404": {
+						"description": "Create failed",
+						"schema": {
+							"$ref": "#/definitions/Error"
+						}
+					}
+				}
+			}
+		},
+		"/containers/{id}/exec/{eid}/start": {
+			"post": {
+				"description": "Starts a previously set up exec instance",
+				"summary": "Starts a previously set up exec instance",
+				"operationId": "ExecStart",
+				"tags": [
+					"containers"
+				],
+				"consumes": [
+					"application/octet-stream",
+					"application/json"
+				],
+				"produces": [
+					"application/json"
+				],
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"type": "string",
+						"required": true
+					},
+					{
+						"name": "eid",
+						"in": "path",
+						"type": "string",
+						"required": true
+					},
+					{
+						"name": "startExecConfig",
+						"in": "body",
+						"required": true,
+						"schema": {
+							"$ref": "#/definitions/ExecStartExecConfig"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK"
+					},
+					"404": {
+						"description": "No such exec instance",
+						"schema": {
+							"$ref": "#/definitions/Error"
+						}
+					},
+					"409": {
+						"description": "Container is stopped or paused",
+						"schema": {
+							"$ref": "#/definitions/Error"
+						}
+					}
+				}
+			}
+		},
+		"/containers/{id}/exec/{eid}/resize": {
+			"post": {
+				"description": "Resize the TTY session used by an exec instance.",
+				"summary": "RResize the TTY session used by an exec instance.",
+				"operationId": "ExecResize",
+				"tags": [
+					"containers"
+				],
+				"consumes": [
+					"application/octet-stream",
+					"application/json"
+				],
+				"produces": [
+					"application/json"
+				],
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"type": "string",
+						"required": true
+					},
+					{
+						"name": "eid",
+						"in": "path",
+						"type": "string",
+						"required": true
+					},
+					{
+						"name": "height",
+						"in": "query",
+						"type": "integer",
+						"format": "int32",
+						"required": true
+					},
+					{
+						"name": "width",
+						"in": "query",
+						"type": "integer",
+						"format": "int32",
+						"required": true
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK"
+					},
+					"404": {
+						"description": "No such exec instance",
+						"schema": {
+							"$ref": "#/definitions/Error"
+						}
+					},
+					"500": {
+						"description": "Exec resize failed",
+						"schema": {
+							"$ref": "#/definitions/Error"
+						}
+					}
+				}
+			}
+		},
+		"/containers/{id}/exec/{eid}/inspect": {
+			"post": {
+				"description": "Return low-level information about an exec instance",
+				"summary": "Return low-level information about an exec instance",
+				"operationId": "ExecInspect",
+				"tags": [
+					"containers"
+				],
+				"consumes": [
+					"application/octet-stream",
+					"application/json"
+				],
+				"produces": [
+					"application/json"
+				],
+				"parameters": [
+					{
+						"name": "id",
+						"in": "path",
+						"type": "string",
+						"required": true
+					},
+					{
+						"name": "eid",
+						"in": "path",
+						"type": "string",
+						"required": true
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"schema": {
+							"$ref": "#/definitions/ExecInspectResponse"
+						}
+					},
+					"404": {
+						"description": "No such exec instance",
+						"schema": {
+							"$ref": "#/definitions/Error"
+						}
+					},
+					"500": {
+						"description": "Exec resize failed",
+						"schema": {
+							"$ref": "#/definitions/Error"
+						}
+					}
+				}
+			}
+		},
+
 		"/containers/{id}/signal": {
 			"post": {
 				"description": "Sends a signal to a container by id",
@@ -2510,6 +2726,55 @@
 				}
 			}
 		},
+		"ContainerCreateExecConfig": {
+			"type": "object",
+			"properties": {
+				"openStdin": {
+					"type": "boolean",
+					"default": false,
+					"x-nullable": false
+				},
+				"openStderr": {
+					"type": "boolean",
+					"default": false,
+					"x-nullable": false
+				},
+				"openStdout": {
+					"type": "boolean",
+					"default": false,
+					"x-nullable": false
+				},
+				"containerId": {
+					"type": "string"
+				},
+				"detachKeys": {
+					"type": "string"
+				},
+				"entrypoint": {
+					"type": "string"
+				},
+				"args": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"tty": {
+					"type": "boolean",
+					"default": false,
+					"x-nullable": false
+				},
+				"user": {
+					"type": "string"
+				},
+				"env": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				}
+			}
+		},
 		"ContainerCreatedInfo": {
 			"type": "object",
 			"required": [
@@ -2523,6 +2788,84 @@
 				},
 				"id": {
 					"type": "string",
+					"x-nullable": false
+				}
+			}
+		},
+		"ContainerExecCreateResponse": {
+			"type": "object",
+			"required": [
+				"handle",
+				"id"
+			],
+			"properties": {
+				"handle": {
+					"type": "string",
+					"x-nullable": false
+				},
+				"id": {
+					"type": "string",
+					"x-nullable": false
+				}
+			}
+		},
+		"ExecStartExecConfig": {
+			"type": "object",
+			"properties": {
+				"detach": {
+					"type": "boolean",
+					"default": false,
+					"x-nullable": false
+				},
+				"tty": {
+					"type": "boolean",
+					"default": false,
+					"x-nullable": false
+				}
+			}
+		},
+		"ExecInspectResponse": {
+			"type": "object",
+			"required": [
+				"id"
+			],
+			"properties": {
+				"id": {
+					"type": "string",
+					"x-nullable": false
+				},
+				"running": {
+					"type": "boolean",
+					"x-nullable": false
+				},
+				"exitCode": {
+					"type": "integer",
+					"x-nullable": false
+				},
+				"processConfig": {
+					"$ref": "#/definitions/ProcessConfig"
+				},
+				"openStdin": {
+					"type": "boolean",
+					"default": false,
+					"x-nullable": false
+				},
+				"openStderr": {
+					"type": "boolean",
+					"default": false,
+					"x-nullable": false
+				},
+				"openStdout": {
+					"type": "boolean",
+					"default": false,
+					"x-nullable": false
+				},
+				"containerId": {
+					"type": "string",
+					"x-nullable": false
+				},
+				"pid": {
+					"type": "integer",
 					"x-nullable": false
 				}
 			}

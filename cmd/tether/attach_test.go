@@ -243,16 +243,34 @@ func attachCase(t *testing.T, runblock bool) {
 					ID:   "attach",
 					Name: "tether_test_session",
 				},
-				Tty:    false,
-				Attach: true,
-				Active: true,
-
+				Tty:       false,
+				Attach:    true,
+				Active:    true,
 				OpenStdin: true,
 				RunBlock:  runblock,
 				Cmd: executor.Cmd{
 					Path: "/usr/bin/tee",
 					// grep, matching everything, reading from stdin
 					Args: []string{"/usr/bin/tee", pathPrefix + "/tee.out"},
+					Env:  []string{},
+					Dir:  "/",
+				},
+			},
+		},
+		Execs: map[string]*executor.SessionConfig{
+			"touch": {
+				Common: executor.Common{
+					ID:   "top", // must be the same as the map key - will be fixed up by tether
+					Name: "tether_test_session",
+				},
+				Tty:       false,
+				Attach:    false,
+				Active:    true,
+				OpenStdin: false,
+				RunBlock:  false,
+				Cmd: executor.Cmd{
+					Path: "/usr/bin/touch",
+					Args: []string{"/usr/bin/touch", "/tmp/touch"},
 					Env:  []string{},
 					Dir:  "/",
 				},

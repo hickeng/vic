@@ -188,32 +188,140 @@ func NewContainerBackend() *Container {
 
 // ContainerExecCreate sets up an exec in a running container.
 func (c *Container) ContainerExecCreate(name string, config *types.ExecConfig) (string, error) {
-	return "", fmt.Errorf("%s does not yet implement ContainerExecCreate", ProductName())
+	defer trace.End(trace.Begin(""))
+
+	// Look up the container name in the metadata cache to get long ID
+	vc := cache.ContainerCache().GetContainer(name)
+	if vc == nil {
+		return "", NotFoundError(name)
+	}
+
+	execConfig := &models.ContainerCreateExecConfig{
+		OpenStdin:   config.AttachStdin,
+		OpenStdout:  config.AttachStdout,
+		OpenStderr:  config.AttachStderr,
+		ContainerID: vc.ContainerID,
+		DetachKeys:  config.DetachKeys,
+		Entrypoint:  config.Cmd[0],
+		Args:        config.Cmd[1:],
+		Env:         config.Env,
+		Tty:         config.Tty,
+		User:        config.User,
+	}
+
+	log.Debugf("execConfig: %#v", execConfig)
+
+	// portlayer client
+	client := c.containerProxy.Client()
+
+	execParams := containers.NewCreateExecParamsWithContext(ctx).WithCreateExecConfig(execConfig).WithID(vc.ContainerID)
+	resp, err := client.Containers.CreateExec(execParams)
+	if err != nil {
+		return "", InternalServerError(err.Error())
+	}
+
+	// Add create event
+	actor := CreateContainerEventActorWithAttributes(vc, map[string]string{})
+	EventService().Log("exec_create", eventtypes.ContainerEventType, actor)
+
+	id := resp.Payload.ID
+	cache.ContainerCache().AddExecToContainer(vc, id, config)
+
+	return id, nil
 }
 
 // ContainerExecInspect returns low-level information about the exec
 // command. An error is returned if the exec cannot be found.
 func (c *Container) ContainerExecInspect(id string) (*backend.ExecInspect, error) {
-	return nil, fmt.Errorf("%s does not yet implement ContainerExecInspect", ProductName())
+	defer trace.End(trace.Begin(""))
+
+	// Look up the container name in the metadata cache to get long ID
+	vc := cache.ContainerCache().GetContainerFromExec(id)
+	if vc == nil {
+		return nil, NotFoundError(id)
+	}
+
+	// portlayer client
+	client := c.containerProxy.Client()
+
+	inspectParams := containers.NewExecInspectParamsWithContext(ctx).WithID(vc.ContainerID).WithEid(id)
+
+	_, err := client.Containers.ExecInspect(inspectParams)
+	if err != nil {
+		return nil, InternalServerError(err.Error())
+	}
+
+	// FIXME(caglar10ur)
+	return &backend.ExecInspect{}, nil
+
 }
 
 // ContainerExecResize changes the size of the TTY of the process
 // running in the exec with the given name to the given height and
 // width.
 func (c *Container) ContainerExecResize(name string, height, width int) error {
-	return fmt.Errorf("%s does not yet implement ContainerExecResize", ProductName())
+	defer trace.End(trace.Begin(""))
+
+	// Look up the container name in the metadata cache to get long ID
+	vc := cache.ContainerCache().GetContainerFromExec(name)
+	if vc == nil {
+		return NotFoundError(name)
+	}
+
+	// portlayer client
+	client := c.containerProxy.Client()
+
+	resizeParams := containers.NewExecResizeParamsWithContext(ctx).WithHeight(int32(height)).WithWidth(int32(width)).WithID(vc.ContainerID).WithEid(name)
+
+	_, err := client.Containers.ExecResize(resizeParams)
+	if err != nil {
+		return InternalServerError(err.Error())
+	}
+
+	return nil
 }
 
 // ContainerExecStart starts a previously set up exec instance. The
 // std streams are set up.
 func (c *Container) ContainerExecStart(ctx context.Context, name string, stdin io.ReadCloser, stdout io.Writer, stderr io.Writer) error {
-	return fmt.Errorf("%s does not yet implement ContainerExecStart", ProductName())
+	defer trace.End(trace.Begin(""))
+
+	// Look up the container name in the metadata cache to get long ID
+	vc := cache.ContainerCache().GetContainerFromExec(name)
+	if vc == nil {
+		return NotFoundError(name)
+	}
+	log.Debugf("starting exec command %s in container %s", name, vc.ContainerID)
+
+	startConfig := &models.ExecStartExecConfig{
+		Detach: false,
+		Tty:    false,
+	}
+
+	// portlayer client
+	client := c.containerProxy.Client()
+
+	startParams := containers.NewExecStartParamsWithContext(ctx).WithStartExecConfig(startConfig).WithID(vc.ContainerID).WithEid(name)
+
+	_, err := client.Containers.ExecStart(startParams)
+	if err != nil {
+		return InternalServerError(err.Error())
+	}
+
+	actor := CreateContainerEventActorWithAttributes(vc, map[string]string{})
+	EventService().Log("exec_start", eventtypes.ContainerEventType, actor)
+
+	return nil
 }
 
 // ExecExists looks up the exec instance and returns a bool if it exists or not.
 // It will also return the error produced by `getConfig`
 func (c *Container) ExecExists(name string) (bool, error) {
-	return false, fmt.Errorf("%s does not yet implement ExecExists", ProductName())
+	vc := cache.ContainerCache().GetContainerFromExec(name)
+	if vc == nil {
+		return false, NotFoundError(name)
+	}
+	return true, nil
 }
 
 // docker's container.copyBackend
@@ -1293,6 +1401,10 @@ payloadLoop:
 	return containers, nil
 }
 
+func (c *Container) ContainersPrune(pruneFilters filters.Args) (*types.ContainersPruneReport, error) {
+	return nil, fmt.Errorf("%s does not yet implement ContainersPrune", ProductName())
+}
+
 // docker's container.attachBackend
 
 // ContainerAttach attaches to logs according to the config passed in. See ContainerAttachConfig.
@@ -1306,10 +1418,6 @@ func (c *Container) ContainerAttach(name string, ca *backend.ContainerAttachConf
 		return err
 	}
 	return nil
-}
-
-func (c *Container) ContainersPrune(pruneFilters filters.Args) (*types.ContainersPruneReport, error) {
-	return nil, fmt.Errorf("%s does not yet implement ContainersPrune", ProductName())
 }
 
 func (c *Container) containerAttach(name string, ca *backend.ContainerAttachConfig) error {
