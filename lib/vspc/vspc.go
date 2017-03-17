@@ -203,7 +203,6 @@ func (vspc *Vspc) relayReads(containervm *cVM, conn net.Conn) {
 			var n int
 			var err error
 			if n, err = conn.Read(b); n > 0 {
-				log.Debugf("vspc read %d bytes from the  remote system connection", n)
 				if !vmotion {
 					if tmpBuf.Len() > 0 {
 						buf := tmpBuf.Bytes()
@@ -221,7 +220,6 @@ func (vspc *Vspc) relayReads(containervm *cVM, conn net.Conn) {
 						log.Errorf("vspc: RelayReads: %v", err)
 						return
 					}
-					log.Debugf("vspc relayed the read data to the containerVM")
 				} else {
 					tmpBuf.Write(b[:n])
 				}
