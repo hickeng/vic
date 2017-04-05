@@ -321,6 +321,11 @@ yum_cached() {
             }
         fi
 
+        # ensure that rpmdb files are large enough to allow MMAP_EXTEND to succeed in
+        # bash for windows (https://github.com/Microsoft/BashOnWindows/issues/658)
+        touch ${INSTALLROOT}/${HOME}/.rpmdb/{__db.001,__db.002,__db.003}
+        find ${INSTALLROOT}/${HOME}/.rpmdb -type f -exec dd if=/dev/zero of={} count=0 bs=1 seek=1M \;
+
         /usr/bin/yum --installroot $INSTALLROOT $ACTION $cmds || {
             echo "Error while running yum command \"$cmds\": $?" 1>&2
             return 4
