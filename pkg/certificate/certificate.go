@@ -257,10 +257,23 @@ func ParseCertificate(cb, kb []byte) (*x509.Certificate, *rsa.PrivateKey, error)
 	defer trace.End(trace.Begin(""))
 
 	block, _ := pem.Decode(cb)
-	cert, err := x509.ParseCertificate(block.Bytes)
+	certs, err := x509.ParseCertificates(block.Bytes)
 	if err != nil {
 		err = errors.Errorf("Failed to parse certificate data: %s", err)
 		return nil, nil, err
+	}
+
+	var cert *x509.Certificate
+	usage := x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature
+	for _, c := range certs {
+		if c.KeyUsage&usage == usage {
+			cert = c
+			break
+		}
+	}
+
+	if cert == nil {
+		return nil, nil, errors.New("unable to find certificate with encipherment and digital signature usage")
 	}
 
 	var key *rsa.PrivateKey
