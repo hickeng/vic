@@ -36,7 +36,7 @@ import (
 
 	"github.com/vmware/vic/cmd/tether/msgs"
 	"github.com/vmware/vic/lib/config/executor"
-	"github.com/vmware/vic/lib/system"
+	"github.com/vmware/vic/lib/tether/shared"
 	"github.com/vmware/vic/pkg/dio"
 	"github.com/vmware/vic/pkg/log/syslog"
 	"github.com/vmware/vic/pkg/serial"
@@ -55,7 +55,7 @@ const (
 	bindDir = "/.tether/.bind"
 )
 
-var Sys = system.New()
+var Sys = shared.Sys
 var once sync.Once
 
 type tether struct {
@@ -156,14 +156,16 @@ func (t *tether) setup() error {
 		}
 	}
 
+	pidDir := shared.PIDFileDir()
+
 	// #nosec: Expect directory permissions to be 0700 or less
-	if err = os.MkdirAll(PIDFileDir(), 0755); err != nil {
-		log.Errorf("could not create pid file directory %s: %s", PIDFileDir(), err)
+	if err = os.MkdirAll(pidDir, 0755); err != nil {
+		log.Errorf("could not create pid file directory %s: %s", pidDir, err)
 	}
 
 	// Create PID file for tether
 	tname := path.Base(os.Args[0])
-	err = ioutil.WriteFile(fmt.Sprintf("%s.pid", path.Join(PIDFileDir(), tname)),
+	err = ioutil.WriteFile(fmt.Sprintf("%s.pid", path.Join(pidDir, tname)),
 		[]byte(fmt.Sprintf("%d", os.Getpid())),
 		0644)
 	if err != nil {
@@ -629,7 +631,7 @@ func (t *tether) handleSessionExit(session *SessionConfig) {
 
 	// Remove associated PID file
 	cmdname := path.Base(session.Cmd.Path)
-	_ = os.Remove(fmt.Sprintf("%s.pid", path.Join(PIDFileDir(), cmdname)))
+	_ = os.Remove(fmt.Sprintf("%s.pid", path.Join(shared.PIDFileDir(), cmdname)))
 
 	// set the stop time
 	session.StopTime = time.Now().UTC().Unix()
@@ -787,7 +789,7 @@ func (t *tether) launch(session *SessionConfig) error {
 
 	// Write the PID to the associated PID file
 	cmdname := path.Base(session.Cmd.Path)
-	err = ioutil.WriteFile(fmt.Sprintf("%s.pid", path.Join(PIDFileDir(), cmdname)),
+	err = ioutil.WriteFile(fmt.Sprintf("%s.pid", path.Join(shared.PIDFileDir(), cmdname)),
 		[]byte(fmt.Sprintf("%d", pid)),
 		0644)
 	if err != nil {
@@ -904,10 +906,6 @@ func (t *tether) Flush() error {
 
 	extraconfig.Encode(t.sink, t.config)
 	return nil
-}
-
-func PIDFileDir() string {
-	return path.Join(Sys.Root, pidFilePath)
 }
 
 // killHelper was pulled from toolbox, and that variant should be directed at this
