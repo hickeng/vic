@@ -68,7 +68,7 @@ func main() {
 		log.Errorf("Could not pipe logfile to standard error due to error %s", err)
 	}
 
-	if _, err = os.Stderr.WriteString("all stderr redirected to debug log"); err != nil {
+	if _, err = os.Stderr.WriteString("all stderr redirected to debug log\n"); err != nil {
 		log.Errorf("Could not write to Stderr due to error %s", err)
 	}
 

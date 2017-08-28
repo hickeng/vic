@@ -101,7 +101,9 @@ else
     # TODO: what do we do here? we really need to somehow report an error
     # fail hard
     echo "Unable to chroot into container filesystem"
+
+    # Shut the system down
+    systemctl poweroff
 fi
 
-# Shut the system down
-systemctl poweroff
+# This is no longer using switch-root directly so code after this point WILL be executed even in the success case
