@@ -81,6 +81,8 @@ func DisplayName(config *spec.VirtualMachineConfigSpecConfig, namingConvention s
 		// standard VM display name convention
 		if len(prettyName) > nameMaxLen-1 {
 			name = fmt.Sprintf("%s-%s", prettyName[:nameMaxLen-1], shortID)
+		} else {
+			name = fmt.Sprintf("%s-%s", prettyName, shortID)
 		}
 	}
 	return name
