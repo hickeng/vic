@@ -98,13 +98,15 @@ fi
 # Install bootstrap base packages
 #
 # List stable packages here
-#   iproute2  # for ip
-#   libtirpc  # due to a previous package reliance on rpc
+#   iproute2    # for ip
+#   libtirpc    # due to a previous package reliance on rpc
+#   util-linux  # photon2 for /bin/mount
 #
 yum_cached -c $cache -u -p $PKGDIR install \
     haveged \
     systemd \
     iptables \
+    util-linux \
     -y --nogpgcheck
 
 # https://www.freedesktop.org/wiki/Software/systemd/InitrdInterface/

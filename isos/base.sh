@@ -26,13 +26,24 @@ echo "Usage: $0 -p package-name(tgz) [-c yum-cache]" 1>&2
 exit 1
 }
 
-while getopts "c:p:" flag
+while getopts "c:p:r:k:" flag
 do
     case $flag in
 
         p)
             # Required. Package name
             PACKAGE="$OPTARG"
+            ;;
+
+        r)
+            # Optional. Name of repo set in base/repos to use
+            REPO="$OPTARG"
+            ;;
+
+        k)
+            # Optional. Allows provision of custom kernel rpm
+            # assumes it contains suitable /boot/vmlinuz-* and /lib/modules/... files
+            CUSTOM_KERNEL_RPM="${OPTARG}"
             ;;
 
         c)
@@ -64,27 +75,47 @@ initialize_bundle $PKGDIR
 # base filesystem setup
 mkdir -p $(rootfs_dir $PKGDIR)/{etc/yum,etc/yum.repos.d}
 ln -s /lib $(rootfs_dir $PKGDIR)/lib64
+
+# work arounds for incorrect filesystem-1.0-13.ph2 package
+mkdir -p $(rootfs_dir $PKGDIR)/{run,var}
+ln -s /run $(rootfs_dir $PKGDIR)/var/run
+
 if [[ $DRONE_BUILD_NUMBER && $DRONE_BUILD_NUMBER > 0 ]]; then
-    cp $DIR/base/*-local.repo $(rootfs_dir $PKGDIR)/etc/yum.repos.d/
-else
-    cp $DIR/base/*-remote.repo $(rootfs_dir $PKGDIR)/etc/yum.repos.d/
+    # THIS SHOULD BE MOVED TO .drone.yml AS IT OVERRIDES THE -r OPTION
+    REPOS="ci"
 fi
+
+cp -a $DIR/base/repos/${REPO:-photon-1.0}/* $(rootfs_dir $PKGDIR)/etc/yum.repos.d/
 cp $DIR/base/yum.conf $(rootfs_dir $PKGDIR)/etc/yum/
 
-# install the core packages
-yum_cached -c $cache -u -p $PKGDIR install filesystem coreutils linux-esx --nogpgcheck -y
+if [ -z "${CUSTOM_KERNEL_RPM}" ]; then
+    PHOTON_KERNEL="linux-esx"
+fi
 
+# install the core packages
+yum_cached -c $cache -u -p $PKGDIR install filesystem coreutils kmod ${PHOTON_KERNEL} --nogpgcheck -y
+
+# check for raw kernel override
+if [ -n "${CUSTOM_KERNEL_RPM}" ]; then
+    ( 
+        echo "Using custom kernel package ${CUSTOM_KERNEL_RPM}"
+        cd $(rootfs_dir $PKGDIR)
+        rpm2cpio ${CUSTOM_KERNEL_RPM} | cpio -idm --extract-over-symlinks
+    )
+fi
 
 # Issue 3858: find all kernel modules and unpack them and run depmod against that directory
-find $(rootfs_dir $PKGDIR)/lib/modules -name "*.ko.xz" | xargs xz -d
+find $(rootfs_dir $PKGDIR)/lib/modules -name "*.ko.xz" -exec xz -d {} \;
 KERNEL_VERSION=$(basename $(rootfs_dir $PKGDIR)/lib/modules/*)
-chroot $(rootfs_dir $PKGDIR) depmod $KERNEL_VERSION
+chroot $(rootfs_dir $PKGDIR) depmod $KERNEL_VERSION 
 
 # strip the cache from the resulting image
 yum_cached -c $cache -p $PKGDIR clean all
 
 # move kernel into bootfs /boot directory so that syslinux could load it
 mv $(rootfs_dir $PKGDIR)/boot/vmlinuz-* $(bootfs_dir $PKGDIR)/boot/vmlinuz64
+# try copying over the other boot files - rhel kernel seems to need a side car configuration file
+find $(rootfs_dir $PKGDIR)/boot -type f | xargs cp -t $(bootfs_dir $PKGDIR)/boot/
 
 # package up the result
 pack $PKGDIR $PACKAGE

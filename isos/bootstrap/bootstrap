@@ -27,7 +27,15 @@ done
 
 MOUNTPOINT="/mnt/containerfs"
 
+/bin/bash
+
 mkdir -p /mnt/containerfs
+#mkdir -p /dev/disk/by-label
+
+### HACK ### bypasses systemd-udev dependency
+#ln -s /dev/sda /dev/disk/by-label/containerfs
+#ln -l pci-0000:03:00.0-scsi-0:0:0:0 
+
 
 echo "Waiting for rootfs"
 while [ ! -e /dev/disk/by-label/containerfs ]; do sleep 0.1;done

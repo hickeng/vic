@@ -30,7 +30,7 @@ echo "Usage: $0 -p staged-package(tgz) -b binary-dir -d <activates debug when se
 exit 1
 }
 
-while getopts "p:b:d:" flag
+while getopts "p:b:d:o:" flag
 do
     case $flag in
 
@@ -46,6 +46,10 @@ do
         d)
             # Optional. directs script to make a debug iso instead of a production iso.
             debug="$OPTARG"
+            ;;
+        o)
+            # Optional. Name of the generated ISO
+            ISONAME="$OPTARG"
             ;;
         *)
 
@@ -72,12 +76,17 @@ unpack $package $PKGDIR
 
 #selecting the init script as our entry point.
 if [ -v debug ]; then
-    export ISONAME="bootstrap-debug.iso"
+    export ISONAME=${ISONAME:-bootstrap-debug.iso}
     cp ${DIR}/bootstrap/bootstrap.debug $(rootfs_dir $PKGDIR)/bin/bootstrap
     cp ${BIN}/rpctool $(rootfs_dir $PKGDIR)/sbin/
 else
-    export ISONAME="bootstrap.iso"
+    export ISONAME=${ISONAME:-bootstrap.iso}
     cp ${DIR}/bootstrap/bootstrap $(rootfs_dir $PKGDIR)/bin/bootstrap
+fi
+
+if [ -n "${CUSTOM}" ]; then
+    mv $(rootfs_dir $PKGDIR)/bin/bootstrap $(rootfs_dir $PKGDIR)/bin/bootstrap.photon
+    cp ${DIR}/bootstrap/${CUSTOM}-bootstrap $(rootfs_dir $PKGDIR)/bin/bootstrap
 fi
 
 # copy in our components
@@ -98,4 +107,8 @@ rm -f $(rootfs_dir $PKGDIR)/etc/systemd/system/sockets.target.wants/systemd-netw
 rm -f $(rootfs_dir $PKGDIR)/etc/systemd/network/*
 cp ${DIR}/base/no-dhcp.network $(rootfs_dir $PKGDIR)/etc/systemd/network/
 
-generate_iso $PKGDIR $BIN/$ISONAME /lib/systemd/systemd
+if [ -n "${CUSTOM}" ]; then
+    generate_iso $PKGDIR $BIN/$ISONAME /bin/bash
+else
+    generate_iso $PKGDIR $BIN/$ISONAME /lib/systemd/systemd
+fi
