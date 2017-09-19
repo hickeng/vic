@@ -76,31 +76,57 @@ initialize_bundle $PKGDIR
 mkdir -p $(rootfs_dir $PKGDIR)/{etc/yum,etc/yum.repos.d}
 ln -s /lib $(rootfs_dir $PKGDIR)/lib64
 
+# TODO: look at moving these prep pieces into the repo as functions
+# sourced and run at appropriate stages
 # work arounds for incorrect filesystem-1.0-13.ph2 package
-mkdir -p $(rootfs_dir $PKGDIR)/{run,var}
-ln -s /run $(rootfs_dir $PKGDIR)/var/run
+if [ "$REPO" == "photon-2.0" ]; then
+    mkdir -p $(rootfs_dir $PKGDIR)/{run,var}
+    ln -s /run $(rootfs_dir $PKGDIR)/var/run
+fi
+
+# work arounds for libgcc.x86_64 0:4.4.7-18.el6 needing /dev/null
+# it looks like udev package will create this but has it's own issues
+if [ "$REPO" == "centos-6.9" ]; then
+    # cpio will return an error on open syscall if lib64 is a symlink
+    rm -f $(rootfs_dir $PKGDIR)/lib64
+    mkdir -p $(rootfs_dir $PKGDIR)/{dev,lib64}
+    mknod $(rootfs_dir $PKGDIR)/dev/null c 1 3
+    chmod 666 $(rootfs_dir $PKGDIR)/dev/null
+fi
 
 if [[ $DRONE_BUILD_NUMBER && $DRONE_BUILD_NUMBER > 0 ]]; then
     # THIS SHOULD BE MOVED TO .drone.yml AS IT OVERRIDES THE -r OPTION
     REPOS="ci"
 fi
 
-cp -a $DIR/base/repos/${REPO:-photon-1.0}/* $(rootfs_dir $PKGDIR)/etc/yum.repos.d/
+# select the repo directory and populate the basic yum config
+REPODIR="$DIR/base/repos/${REPO:-photon-1.0}/"
+cp -a $REPODIR/*.repo $(rootfs_dir $PKGDIR)/etc/yum.repos.d/
 cp $DIR/base/yum.conf $(rootfs_dir $PKGDIR)/etc/yum/
 
-if [ -z "${CUSTOM_KERNEL_RPM}" ]; then
-    PHOTON_KERNEL="linux-esx"
+# determine the kernel package
+KERNEL=$(cat $REPODIR/kernel.pkg | awk '/^[^#]/{print}')
+# if the kernel isn't a file then install it with the other packages
+if [ -n "$CUSTOM_KERNEL_RPM" ]; then
+    echo "Using kernel package from environment: $CUSTOM_KERNEL_RPM"
+    KERNEL=$CUSTOM_KERNEL_RPM
+elif [ ! -f $KERNEL ]; then
+    echo "Using kernel repo package: $KERNEL"
+    KERNEL_PKG=$KERNEL
+else
+    echo "Using kernel file package: $KERNEL"
+    KERNEL="$(pwd)/$KERNEL"
 fi
 
-# install the core packages
-yum_cached -c $cache -u -p $PKGDIR install filesystem coreutils kmod ${PHOTON_KERNEL} --nogpgcheck -y
+# install the core packages - strip lines starting with #
+CORE_PKGS=$(cat $REPODIR/base.pkgs | awk '/^[^#]/{print}')
+yum_cached -c $cache -u -p $PKGDIR install $CORE_PKGS $KERNEL_PKG --nogpgcheck -y
 
 # check for raw kernel override
-if [ -n "${CUSTOM_KERNEL_RPM}" ]; then
-    ( 
-        echo "Using custom kernel package ${CUSTOM_KERNEL_RPM}"
+if [ -z "$KERNEL_PKG" ]; then
+    (
         cd $(rootfs_dir $PKGDIR)
-        rpm2cpio ${CUSTOM_KERNEL_RPM} | cpio -idm --extract-over-symlinks
+        rpm2cpio $KERNEL | cpio -idm --extract-over-symlinks
     )
 fi
 

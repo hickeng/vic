@@ -327,7 +327,8 @@ yum_cached() {
             }
         fi
 
-        /usr/bin/yum --installroot $INSTALLROOT $ACTION $cmds || {
+        # we set home so that it doesn't inherit path from caller if invoked with sudo -E
+        HOME=root /usr/bin/yum --installroot $INSTALLROOT $ACTION $cmds || {
             echo "Error while running yum command \"$cmds\": $?" 1>&2
             return 4
         }

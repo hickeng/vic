@@ -39,7 +39,7 @@ GVT ?= $(GOPATH)/bin/gvt$(BIN_ARCH)
 GOVC ?= $(GOPATH)/bin/govc$(BIN_ARCH)
 GAS ?= $(GOPATH)/bin/gas$(BIN_ARCH)
 MISSPELL ?= $(GOPATH)/bin/misspell$(BIN_ARCH)
-CUSTOM ?= custom
+CUSTOM ?= photon-2.0
 
 .PHONY: all tools clean test check distro \
 	goversion goimports gopath govet gofmt misspell gas golint \
@@ -120,8 +120,7 @@ bootstrap-staging := $(BIN)/.bootstrap-staging.tgz
 bootstrap-staging-custom := $(BIN)/.bootstrap-staging-$(CUSTOM).tgz
 bootstrap-staging-debug := $(BIN)/.bootstrap-staging-debug.tgz
 bootstrap-debug := $(BIN)/bootstrap-debug.iso
-iso-base-photon1 := $(BIN)/.iso-base-photon1.tgz
-iso-base-photon2 := $(BIN)/.iso-base-photon2.tgz
+iso-base := $(BIN)/.iso-base-photon1.tgz
 iso-base-custom := $(BIN)/.iso-base-$(CUSTOM).tgz
 
 # target aliases - target mapping
@@ -151,9 +150,7 @@ bootstrap-staging: $(bootstrap-staging)
 bootstrap-staging-custom: $(bootstrap-staging-custom)
 bootstrap-debug: $(bootstrap-debug)
 bootstrap-staging-debug: $(bootstrap-staging-debug)
-iso-base: $(iso-base-photon1) $(iso-base-photon2)
-iso-base-photon1: $(iso-base-photon1)
-iso-base-photon2: $(iso-base-photon2)
+iso-base: $(iso-base-photon1)
 iso-base-custom: $(iso-base-custom)
 
 vic-machine: $(vic-machine-linux) $(vic-machine-windows) $(vic-machine-darwin)
@@ -389,18 +386,15 @@ $(serviceapi): $$(call godeps,cmd/vic-machine-server/*.go) $(serviceapi-server)
 	@echo building vic-machine-as-a-service API server...
 	@$(TIME) $(GO) build $(RACE) -ldflags "$(LDFLAGS)" -o $@ ./cmd/vic-machine-server
 
-$(iso-base-photon1): isos/base.sh isos/base/*.repo isos/base/isolinux/** isos/base/xorriso-options.cfg
+$(iso-base-photon1): isos/base.sh isos/base/repos/photon-1.0/*.repo isos/base/isolinux/** isos/base/xorriso-options.cfg
 	@echo "building iso-base image (photon-1.0)"
-	@$(TIME) $< -c $(BIN)/.yum-cache.tgz -p $@
+	@$(TIME) $< -r photon-1.0 -c $(BIN)/.yum-cache.tgz -p $@
 
-$(iso-base-photon2): isos/base.sh isos/base/*.repo isos/base/isolinux/** isos/base/xorriso-options.cfg
-	@echo "building iso-base image (photon-2.0)"
-	@$(TIME) $< -r 'photon-2.0' -c $(BIN)/.yum-cache.tgz -p $@
-
-$(iso-base-custom): isos/base.sh isos/base/*.repo isos/base/isolinux/** isos/base/xorriso-options.cfg
-	@echo "building custom iso-base image (photon-2.0 packages)"
-	@test -n $(CUSTOM_RPM)"" || { echo "CUSTOM_RPM must be set when building custom base" && false; }  
-	@$(TIME) $< -r 'photon-2.0' -c $(BIN)/.yum-cache.tgz -k $(CUSTOM_RPM) -p $@
+$(iso-base-custom): isos/base.sh isos/base/repos/$(CUSTOM)/*.repo isos/base/isolinux/** isos/base/xorriso-options.cfg
+	@echo "building custom iso-base image ($(CUSTOM) packages)"
+	@$(TIME) $< -r $(CUSTOM) -c $(BIN)/.yum-cache.tgz -p $@
+	#Add support for the custom_rpm env variable
+	#@$(TIME) $< -r $(CUSTOM) -c $(BIN)/.yum-cache.tgz -k $(CUSTOM_RPM) -p $@
 
 # appliance staging - allows for caching of package install
 $(appliance-staging): isos/appliance-staging.sh $(iso-base-photon1)
