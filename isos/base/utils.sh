@@ -98,7 +98,7 @@ pack() {
     out=$(readlink -f $2)
     (
         cd $1
-        tar -zcf $out rootfs bootfs xorriso* || {
+        tar -zcf $out rootfs bootfs xorriso* *.cfg || {
             echo "Failed to package bundle directory: $?" 1>&2
             return 1
         }
@@ -306,10 +306,11 @@ yum_cached() {
         return 1
     }
 
+    CACHE_DIR=${INSTALLROOT}/var/cache/yum
     # bundle specific - if we're cleaning the cache and we want it all gone
     # $1 because of the shift after getopts
     if [ "$1" == "clean" -a "$2" == "all" ]; then
-        rm -fr ${INSTALLROOT}/var/cache/yum/*
+        rm -fr ${CACHE_DIR}/*
     else
         # do this before we bother unpacking the cache
         ensure_apt_packages yum || {
@@ -327,6 +328,8 @@ yum_cached() {
             }
         fi
 
+        touch ${CACHE_DIR}/.unpack
+
         # we set home so that it doesn't inherit path from caller if invoked with sudo -E
         HOME=root /usr/bin/yum --installroot $INSTALLROOT $ACTION $cmds || {
             echo "Error while running yum command \"$cmds\": $?" 1>&2
@@ -335,7 +338,8 @@ yum_cached() {
     fi
 
     # repack cache
-    if [ -n "$update" -a -n "${cache}" -a -d ${INSTALLROOT}/var/cache/yum ]; then
+    find ${CACHE_DIR} -type f -newer ${CACHE_DIR}/.unpack -exec touch ${CACHE_DIR}/.update-cache \;
+    if [ -n "$update" -a -n "${cache}" -a -f ${CACHE_DIR}/.update-cache ]; then
         tar -C ${INSTALLROOT} -zcf $cache var/cache/yum
     fi
 }

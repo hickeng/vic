@@ -390,7 +390,7 @@ $(iso-base-photon1): isos/base.sh isos/base/repos/photon-1.0/*.repo isos/base/is
 	@echo "building iso-base image (photon-1.0)"
 	@$(TIME) $< -r photon-1.0 -c $(BIN)/.yum-cache.tgz -p $@
 
-$(iso-base-custom): isos/base.sh isos/base/repos/$(CUSTOM)/*.repo isos/base/isolinux/** isos/base/xorriso-options.cfg
+$(iso-base-custom): isos/base.sh isos/base/repos/$(CUSTOM)/*.repo isos/base/repos/$(CUSTOM)/base.pkgs isos/base/isolinux/** isos/base/xorriso-options.cfg
 	@echo "building custom iso-base image ($(CUSTOM) packages)"
 	@$(TIME) $< -r $(CUSTOM) -c $(BIN)/.yum-cache.tgz -p $@
 	#Add support for the custom_rpm env variable
@@ -424,7 +424,7 @@ $(bootstrap-staging): isos/bootstrap-staging.sh $(iso-base-photon2)
 	@echo staging for bootstrap
 	@$(TIME) $< -c $(BIN)/.yum-cache.tgz -p $(iso-base-photon2) -o $@
 
-$(bootstrap-staging-custom): isos/bootstrap-staging.sh $(iso-base-custom)
+$(bootstrap-staging-custom): isos/bootstrap-staging.sh isos/base/repos/$(CUSTOM)/staging.pkgs $(iso-base-custom)
 	@echo custum staging for bootstrap
 	@$(TIME) $< -c $(BIN)/.yum-cache.tgz -p $(iso-base-custom) -o $@
 

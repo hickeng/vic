@@ -74,6 +74,9 @@ PKGDIR=$(mktemp -d)
 
 unpack $package $PKGDIR
 
+# load the repo to use from the package if not explicit in env
+REPODIR="$DIR/base/repos/${REPO:-$(cat $PKGDIR/repo.cfg)}/"
+
 #selecting the init script as our entry point.
 if [ -v debug ]; then
     export ISONAME=${ISONAME:-bootstrap-debug.iso}
@@ -84,31 +87,31 @@ else
     cp ${DIR}/bootstrap/bootstrap $(rootfs_dir $PKGDIR)/bin/bootstrap
 fi
 
-if [ -n "${CUSTOM}" ]; then
-    mv $(rootfs_dir $PKGDIR)/bin/bootstrap $(rootfs_dir $PKGDIR)/bin/bootstrap.photon
-    cp ${DIR}/bootstrap/${CUSTOM}-bootstrap $(rootfs_dir $PKGDIR)/bin/bootstrap
-fi
-
 # copy in our components
 cp ${BIN}/tether-linux $(rootfs_dir $PKGDIR)/bin/tether
 
-# kick off our components at boot time
-mkdir -p $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants
-cp ${DIR}/bootstrap/tether.service $(rootfs_dir $PKGDIR)/etc/systemd/system/
-cp ${DIR}/appliance/vic.target $(rootfs_dir $PKGDIR)/etc/systemd/system/
-ln -s /etc/systemd/system/tether.service $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants/
-ln -sf /etc/systemd/system/vic.target $(rootfs_dir $PKGDIR)/etc/systemd/system/default.target
+if [ -d $(rootfs_dir $PKGDIR)/etc/systemd ]; then
+    echo "Preparing systemd for bootstrap"
+    # kick off our components at boot time
+    mkdir -p $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants
+    cp ${DIR}/bootstrap/tether.service $(rootfs_dir $PKGDIR)/etc/systemd/system/
+    cp ${DIR}/appliance/vic.target $(rootfs_dir $PKGDIR)/etc/systemd/system/
+    ln -s /etc/systemd/system/tether.service $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants/
+    ln -sf /etc/systemd/system/vic.target $(rootfs_dir $PKGDIR)/etc/systemd/system/default.target
 
-# disable networkd given we manage the link state directly
-rm -f $(rootfs_dir $PKGDIR)/etc/systemd/system/multi-user.target.wants/systemd-networkd.service
-rm -f $(rootfs_dir $PKGDIR)/etc/systemd/system/sockets.target.wants/systemd-networkd.socket
+    # disable networkd given we manage the link state directly
+    rm -f $(rootfs_dir $PKGDIR)/etc/systemd/system/multi-user.target.wants/systemd-networkd.service
+    rm -f $(rootfs_dir $PKGDIR)/etc/systemd/system/sockets.target.wants/systemd-networkd.socket
 
-# do not use the systemd dhcp client
-rm -f $(rootfs_dir $PKGDIR)/etc/systemd/network/*
-cp ${DIR}/base/no-dhcp.network $(rootfs_dir $PKGDIR)/etc/systemd/network/
-
-if [ -n "${CUSTOM}" ]; then
-    generate_iso $PKGDIR $BIN/$ISONAME /bin/bash
+    # do not use the systemd dhcp client
+    rm -f $(rootfs_dir $PKGDIR)/etc/systemd/network/*
+    cp ${DIR}/base/no-dhcp.network $(rootfs_dir $PKGDIR)/etc/systemd/network/
 else
-    generate_iso $PKGDIR $BIN/$ISONAME /lib/systemd/systemd
+    echo "Preparing systemV init for bootstrap"
+    # copy in sysv-init entry script
+    cp ${DIR}/bootstrap/sysvinit $(rootfs_dir $PKGDIR)/bin/sysvinit
+    cp ${REPODIR}/init.sh $(rootfs_dir $PKGDIR)/bin/repoinit
 fi
+
+INIT=$(cat $REPODIR/init.cfg | awk '/^[^#]/{print}')
+generate_iso $PKGDIR $BIN/$ISONAME $INIT

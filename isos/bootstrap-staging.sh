@@ -76,6 +76,9 @@ PKGDIR=$(mktemp -d)
 
 unpack $package $PKGDIR
 
+# load the repo to use from the package if not explicit in env
+REPODIR="$DIR/base/repos/${REPO:-$(cat $PKGDIR/repo.cfg)}/"
+
 if [ -v debug ]; then
     # These are the packages we install to create an interactive bootstrapVM
     # Install bootstrap base packages
@@ -102,12 +105,9 @@ fi
 #   libtirpc    # due to a previous package reliance on rpc
 #   util-linux  # photon2 for /bin/mount
 #
-yum_cached -c $cache -u -p $PKGDIR install \
-    haveged \
-    systemd \
-    iptables \
-    util-linux \
-    -y --nogpgcheck
+STAGING_PKGS=$(cat $REPODIR/staging.pkgs | awk '/^[^#]/{print}')
+yum_cached -c $cache -u -p $PKGDIR install $STAGING_PKGS --nogpgcheck -y
+
 
 # https://www.freedesktop.org/wiki/Software/systemd/InitrdInterface/
 touch $(rootfs_dir $PKGDIR)/etc/initrd-release

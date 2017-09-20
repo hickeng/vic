@@ -64,6 +64,8 @@ if [ ! -z "$*" -o -z "$PACKAGE" ]; then
     usage
 fi
 
+REPO=${REPO:-photon-1.0}
+
 # prep the build system
 ensure_apt_packages cpio rpm tar ca-certificates xz-utils
 
@@ -100,9 +102,11 @@ if [[ $DRONE_BUILD_NUMBER && $DRONE_BUILD_NUMBER > 0 ]]; then
 fi
 
 # select the repo directory and populate the basic yum config
-REPODIR="$DIR/base/repos/${REPO:-photon-1.0}/"
+REPODIR="$DIR/base/repos/${REPO}/"
 cp -a $REPODIR/*.repo $(rootfs_dir $PKGDIR)/etc/yum.repos.d/
 cp $DIR/base/yum.conf $(rootfs_dir $PKGDIR)/etc/yum/
+# allow future stages to know which repo this is using
+echo "$REPO" > $PKGDIR/repo.cfg
 
 # determine the kernel package
 KERNEL=$(cat $REPODIR/kernel.pkg | awk '/^[^#]/{print}')
