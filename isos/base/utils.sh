@@ -326,6 +326,8 @@ yum_cached() {
                 echo "Unpacking yum cache $cache failed: $?" 1>&2
                 return 3
             }
+        else
+            mkdir -p ${CACHE_DIR}
         fi
 
         touch ${CACHE_DIR}/.unpack

@@ -47,7 +47,7 @@ install-iptables () {
     # copy iptables and all associated libraries to target from current root
     mkdir -p $1/{bin,lib64}
     cp -Ln /lib64/ld-linux-x86-64.so.2 $1/lib64/
-    cp -L /sbin/iptables $1/bin/iptables.exe
+    cp -L /sbin/iptables $1/bin/iptables
 
     # TODO: figure out what to do with the /etc/alternatives symlinks
     # just copy the target of the link for now
@@ -57,10 +57,10 @@ install-iptables () {
     # TODO: stop assuming bash - can we replace with:
     # a. json config with rtld, rtld args, binary, binary args, chroot?
     # b. Go plugins for tether extensions
-    cat - > $1/bin/iptables <<IPTABLES
+    cat - > $1/bin/iptables-wrapper <<IPTABLES
 #!/bin/sh
-chroot /.tether/ /lib64/ld-linux-x86-64.so.2 /bin/iptables.exe "\$@"
+exec chroot /.tether/ /lib64/ld-linux-x86-64.so.2 /bin/iptables "\$@"
 IPTABLES
 
-    chmod a+x $1/bin/iptables
+    chmod a+x $1/bin/iptables-wrapper
 }

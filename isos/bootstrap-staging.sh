@@ -109,9 +109,6 @@ STAGING_PKGS=$(cat $REPODIR/staging.pkgs | awk '/^[^#]/{print}')
 yum_cached -c $cache -u -p $PKGDIR install $STAGING_PKGS --nogpgcheck -y
 
 
-# https://www.freedesktop.org/wiki/Software/systemd/InitrdInterface/
-touch $(rootfs_dir $PKGDIR)/etc/initrd-release
-
 # ensure we're not including a cache in the staging bundle
 # but don't update the cache bundle we're using to install
 yum_cached -p $PKGDIR clean all

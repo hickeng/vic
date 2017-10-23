@@ -147,5 +147,8 @@ mv $(rootfs_dir $PKGDIR)/boot/vmlinuz-* $(bootfs_dir $PKGDIR)/boot/vmlinuz64
 # try copying over the other boot files - rhel kernel seems to need a side car configuration file
 find $(rootfs_dir $PKGDIR)/boot -type f | xargs cp -t $(bootfs_dir $PKGDIR)/boot/
 
+# https://www.freedesktop.org/wiki/Software/systemd/InitrdInterface/
+touch $(rootfs_dir $PKGDIR)/etc/initrd-release
+
 # package up the result
 pack $PKGDIR $PACKAGE
