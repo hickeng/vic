@@ -124,6 +124,9 @@ sed -i -e "s/^root:[^:]*:/root:${pwhash}:/" $(rootfs_dir $PKGDIR)/etc/shadow
 rm $(rootfs_dir $PKGDIR)/usr/lib/systemd/system/sshd@.service
 rm $(rootfs_dir $PKGDIR)/etc/systemd/system/multi-user.target.wants/sshd.service
 
+# Tie vspc.localhost to management address by default - cannot specify loopback or it blends localhost entries
+echo "0.0.0.0 vspc.localhost management.localhost" > $(rootfs_dir $PKGDIR)/etc/hosts
+
 # Allow root login via ssh
 sed -i -e "s/\#*PermitRootLogin\s.*/PermitRootLogin yes/" $(rootfs_dir $PKGDIR)/etc/ssh/sshd_config
 

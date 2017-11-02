@@ -27,20 +27,20 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-func lookupVCHIP() (net.IP, error) {
+func lookupVSPCIP() (net.IP, error) {
 	// FIXME: THERE MUST BE ANOTHER WAY
 	// following is from Create@exec.go
-	ips, err := net.LookupIP(constants.ManagementHostName)
+	ips, err := net.LookupIP(constants.VSPCHostName)
 	if err != nil {
 		return nil, err
 	}
 
 	if len(ips) == 0 {
-		return nil, fmt.Errorf("No IP found on %s", constants.ManagementHostName)
+		return nil, fmt.Errorf("No IP found on %s", constants.VSPCHostName)
 	}
 
 	if len(ips) > 1 {
-		return nil, fmt.Errorf("Multiple IPs found on %s: %#v", constants.ManagementHostName, ips)
+		return nil, fmt.Errorf("Multiple IPs found on %s: %#v", constants.VSPCHostName, ips)
 	}
 	return ips[0], nil
 }
@@ -71,7 +71,7 @@ func toggle(handle *exec.Handle, id string, connected bool) (*exec.Handle, error
 	}
 	serial := serials[0]
 
-	ip, err := lookupVCHIP()
+	ip, err := lookupVSPCIP()
 	if err != nil {
 		return nil, err
 	}

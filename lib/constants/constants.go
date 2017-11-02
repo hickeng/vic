@@ -26,6 +26,7 @@ const (
 	SerialOverLANPort  = 2377
 	AttachServerPort   = 2379
 	ManagementHostName = "management.localhost"
+	VSPCHostName       = "vspc.localhost"
 	ClientHostName     = "client.localhost"
 
 	// DebugPortLayerPort defines the portlayer port while debug level is greater than 2
