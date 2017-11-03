@@ -616,9 +616,18 @@ func ApplyEndpoint(nl Netlink, t *BaseOperations, endpoint *NetworkEndpoint) err
 		newIP = &endpoint.DHCP.Assigned
 	} else {
 		newIP = endpoint.IP
-		if newIP.IP.Equal(net.IPv4zero) {
+		if newIP != nil && newIP.IP.Equal(net.IPv4zero) {
 			// managed externally
 			return nil
+		}
+
+		// if it's not got an explicit static address, but isn't using dhcp client (e.g. bridge network)
+		if newIP == nil || ip.IsUnspecifiedIP(newIP.IP) {
+			newIP = &endpoint.Assigned
+		}
+
+		if ip.IsUnspecifiedIP(newIP.IP) {
+			return fmt.Errorf("no IP address assigned for static interface: %s", endpoint.ID)
 		}
 	}
 

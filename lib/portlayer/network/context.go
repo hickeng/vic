@@ -696,7 +696,7 @@ func (c *Context) bindContainer(h *exec.Handle) ([]*Endpoint, error) {
 		}()
 
 		var eip *net.IP
-		if ne.Static {
+		if ne.Static && ne.IP != nil {
 			eip = &ne.IP.IP
 		} else if !ip.IsUnspecifiedIP(ne.Assigned.IP) {
 			// for VCH restart, we need to reserve
@@ -730,7 +730,7 @@ func (c *Context) bindContainer(h *exec.Handle) ([]*Endpoint, error) {
 		}
 
 		if !ip.IsUnspecifiedIP(e.IP()) {
-			ne.IP = &net.IPNet{
+			ne.Assigned = net.IPNet{
 				IP:   e.IP(),
 				Mask: e.Scope().Subnet().Mask,
 			}
@@ -1184,7 +1184,11 @@ func (c *Context) AddContainer(h *exec.Handle, options *AddContainerOptions) err
 		ne.Network.Pools[i] = *p
 	}
 
-	ne.Static = false
+	// no DHCP on bridge networks
+	if s.Type() == constants.BridgeScopeType {
+		ne.Static = true
+	}
+
 	if len(options.IP) > 0 && !ip.IsUnspecifiedIP(options.IP) {
 		ne.Static = true
 		ne.IP = &net.IPNet{

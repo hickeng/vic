@@ -857,6 +857,8 @@ func (t *tether) launch(session *SessionConfig) error {
 
 	// Set the Started key to "true" - this indicates a successful launch
 	session.Started = "true"
+	// Set the start time - this may have been set previously OOB but this is definitive so just overwrite
+	session.StartTime = time.Now().UTC().Unix()
 
 	// Write the PID to the associated PID file
 	cmdname := path.Base(session.Cmd.Path)

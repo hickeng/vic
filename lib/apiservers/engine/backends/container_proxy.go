@@ -959,7 +959,7 @@ func (c *ContainerProxy) Signal(vc *viccontainer.VicContainer, sig uint64) error
 		return InternalServerError("Signal failed to create a portlayer client")
 	}
 
-	if state, err := c.State(vc); !state.Running && err == nil {
+	if state, err := c.State(vc); state != nil && !state.Running {
 		return fmt.Errorf("%s is not running", vc.ContainerID)
 	}
 
