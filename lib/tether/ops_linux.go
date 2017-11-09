@@ -106,6 +106,8 @@ type Netlink interface {
 	AddrList(netlink.Link, int) ([]netlink.Addr, error)
 	AddrAdd(netlink.Link, *netlink.Addr) error
 	AddrDel(netlink.Link, *netlink.Addr) error
+	RouteList(link netlink.Link, family int) ([]netlink.Route, error)
+	RouteListFiltered(family int, filter *netlink.Route, filterMask uint64) ([]netlink.Route, error)
 	RouteAdd(*netlink.Route) error
 	RouteDel(*netlink.Route) error
 	RuleList(family int) ([]netlink.Rule, error)
@@ -144,6 +146,14 @@ func (t *BaseOperations) AddrAdd(link netlink.Link, addr *netlink.Addr) error {
 
 func (t *BaseOperations) AddrDel(link netlink.Link, addr *netlink.Addr) error {
 	return netlink.AddrDel(link, addr)
+}
+
+func (t *BaseOperations) RouteList(family int, filter *netlink.Route, filterMask uint64) ([]Route, error) {
+	return netlink.RouteListFiltered(family, filter, filterMask)
+}
+
+func (t *BaseOperations) RouteListFiltered(family int, filter *netlink.Route, filterMask uint64) ([]Route, error) {
+	return netlink.RouteListFiltered(family, filter, filterMask)
 }
 
 func (t *BaseOperations) RouteAdd(route *netlink.Route) error {
@@ -416,14 +426,14 @@ func linkAddrUpdate(old, new *net.IPNet, t Netlink, link netlink.Link) error {
 	return nil
 }
 
-func updateRoutes(t Netlink, link netlink.Link, endpoint *NetworkEndpoint) error {
+func updateRoutes(oldIP, newIP *net.IPNet, t Netlink, link netlink.Link, endpoint *NetworkEndpoint) error {
 	gw := endpoint.Network.Assigned.Gateway
 	if ip.IsUnspecifiedIP(gw.IP) {
 		return nil
 	}
 
 	if endpoint.Network.Default {
-		return updateDefaultRoute(t, link, endpoint)
+		return updateDefaultRoute(oldIP, newIP, t, link, endpoint)
 	}
 
 	for _, d := range endpoint.Network.Destinations {
@@ -456,8 +466,14 @@ func bridgeTableExists(t Netlink) bool {
 	return false
 }
 
-func updateDefaultRoute(t Netlink, link netlink.Link, endpoint *NetworkEndpoint) error {
+func updateDefaultRoute(oldIP, oldGW, newIP *net.IPNet, t Netlink, link netlink.Link, endpoint *NetworkEndpoint) error {
 	gw := endpoint.Network.Assigned.Gateway
+
+	// has the subnet or default gateway changed?
+	if old != nil && oldIP.Contains(newIP.IP) {
+		return nil
+	}
+
 	// Add routes
 	if !endpoint.Network.Default || ip.IsUnspecifiedIP(gw.IP) {
 		log.Debugf("not setting route for network: default=%v gateway=%s", endpoint.Network.Default, gw.IP)
@@ -489,7 +505,15 @@ func updateDefaultRoute(t Netlink, link netlink.Link, endpoint *NetworkEndpoint)
 		return fmt.Errorf("failed to add gateway route for endpoint %s: %s", endpoint.Network.Name, err)
 	}
 
+	// TODO: the bridge table is specific to the endpointVM and this code should be present in cmd/vic-init not in the base tether code.
+	// This is not being done with this commit because splitting function between lib/tether and cmd/vic-init for the routing
+	// manipulation is currently problematic due to code structure
 	if bTablePresent {
+		route = &netlink.Route{LinkIndex: link.Attrs().Index, Dst: defaultNet, Gw: gw.IP, Table: bridgeTableNumber}
+		if err := t.RouteAdd(route); err != nil {
+			return fmt.Errorf("failed to add gateway route for table bridge.out for endpoint %s: %s", endpoint.Network.Name, err)
+		}
+
 		route = &netlink.Route{LinkIndex: link.Attrs().Index, Dst: defaultNet, Gw: gw.IP, Table: bridgeTableNumber}
 		if err := t.RouteAdd(route); err != nil {
 			return fmt.Errorf("failed to add gateway route for table bridge.out for endpoint %s: %s", endpoint.Network.Name, err)
@@ -631,13 +655,13 @@ func ApplyEndpoint(nl Netlink, t *BaseOperations, endpoint *NetworkEndpoint) err
 		return err
 	}
 
-	updateEndpoint(newIP, endpoint)
-
-	if err = updateRoutes(nl, link, endpoint); err != nil {
+	if err = t.updateHosts(endpoint); err != nil {
 		return err
 	}
 
-	if err = t.updateHosts(endpoint); err != nil {
+	updateEndpoint(newIP, endpoint)
+
+	if err = updateRoutes(old, newIP, nl, link, endpoint); err != nil {
 		return err
 	}
 
