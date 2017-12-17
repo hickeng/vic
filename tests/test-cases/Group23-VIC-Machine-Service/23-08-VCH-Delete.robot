@@ -19,6 +19,8 @@ Resource          ../../resources/Group23-VIC-Machine-Service-Util.robot
 Suite Setup       Start VIC Machine Server
 Suite Teardown    Terminate All Processes    kill=True
 Test Setup        Install And Prepare VIC Appliance
+Test Teardown     Cleanup VIC Appliance On Test Server
+
 Default Tags
 
 
@@ -235,6 +237,9 @@ Delete VCH
 
     Verify VCH Not Exists             vch/${id}
 
+    # no VCH present at this point
+    [Teardown]                        NONE
+
 
 Delete VCH within datacenter
     ${dc}=    Get Datacenter ID
@@ -247,6 +252,9 @@ Delete VCH within datacenter
     Verify Status Accepted
 
     Verify VCH Not Exists             datacenter/${dc}/vch/${id}
+
+    # no VCH present at this point
+    [Teardown]                        NONE
 
 
 Delete the correct VCH
@@ -268,6 +276,8 @@ Delete the correct VCH
 
     Verify VCH Not Exists             vch/${one}    ${old}
     Verify VCH Exists                 vch/${two}
+
+    # VCH ${two} present at this point
 
 
 Delete invalid VCH
@@ -341,6 +351,9 @@ Delete VCH with powered off container
     Verify VCH Not Exists             vch/${id}
     Verify Container Not Exists       ${POWERED_OFF_CONTAINER_NAME}
 
+    # no VCH present at this point
+    [Teardown]                        NONE
+
 
 Delete VCH with powered off container deletes files
     ${id}=    Get VCH ID %{VCH-NAME}
@@ -362,6 +375,9 @@ Delete VCH with powered off container deletes files
     Should Contain                    ${ds}    was not found
 
     Verify VCH Not Exists             vch/${id}
+
+    # no VCH present at this point
+    [Teardown]                        NONE
 
 
 Delete VCH without deleting powered on container
@@ -424,6 +440,9 @@ Delete VCH and delete powered on container
     Verify Container Not Exists       ${POWERED_ON_CONTAINER_NAME}
     Verify Container Not Exists       ${POWERED_OFF_CONTAINER_NAME}
 
+    # no VCH present at this point
+    [Teardown]                        NONE    
+
 
 Delete VCH and powered off containers and volumes
     [Setup]    Install And Prepare VIC Appliance With Volume Stores
@@ -457,6 +476,9 @@ Delete VCH and powered off containers and volumes
     Verify Volume Store Not Exists    ${VOLUME_STORE_PATH}
     Verify Volume Not Exists          ${VOLUME_STORE_PATH}           ${OFF_NV_NVS_VOLUME_NAME}
 
+    # no VCH present at this point
+    [Teardown]                        NONE
+
 
 Delete VCH and powered on containers and volumes
     [Setup]    Install And Prepare VIC Appliance With Volume Stores
@@ -489,6 +511,9 @@ Delete VCH and powered on containers and volumes
     Verify Container Not Exists       ${ON_NV_NVS_CONTAINER_NAME}
     Verify Volume Store Not Exists    ${VOLUME_STORE_PATH}
     Verify Volume Not Exists          ${VOLUME_STORE_PATH}           ${ON_NV_NVS_VOLUME_NAME}
+
+    # no VCH present at this point
+    [Teardown]                        NONE
 
 
 Delete VCH and powered off container and preserve volumes
