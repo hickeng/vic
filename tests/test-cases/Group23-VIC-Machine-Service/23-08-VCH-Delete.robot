@@ -199,9 +199,11 @@ Verify VCH Not Exists
 Verify Volume Exists
     [Arguments]    ${volume}    ${name}
 
-    ${ds}=    Run    govc datastore.ls ${volume}/volumes/${name}
+    ${ds}=    Run                   govc datastore.ls ${volume}/volumes/${name}
+    Should Not Contain              ${ds}    was not found
 
-    Should Not Contain                ${ds}    was not found
+    ${dv}=   Run Docker Command     docker volume ls
+    Should Contain                  ${dv}    ${name}
 
 Verify Volume Not Exists
     [Arguments]    ${volume}    ${name}
@@ -598,6 +600,7 @@ Delete VCH and powered on container but preserve volume
     ${id}=    Get VCH ID %{VCH-NAME}
 
     Verify VCH Exists                 vch/${id}
+    Verify Volume Exists              %{VCH-NAME}-VOL                ${ON_NV_DVS_VOLUME_NAME}
 
     Run Docker Command    create --name ${ON_NV_DVS_CONTAINER_NAME} -v ${ON_NV_DVS_VOLUME_NAME}:/volume ${busybox} /bin/top
     Verify Return Code
