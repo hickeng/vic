@@ -92,6 +92,10 @@ cp ${BIN}/tether-linux $(rootfs_dir $PKGDIR)/bin/tether
 
 if [ -d $(rootfs_dir $PKGDIR)/etc/systemd ]; then
     echo "Preparing systemd for bootstrap"
+
+    # copy in sysv-init entry script
+    cp ${DIR}/bootstrap/systemd-init $(rootfs_dir $PKGDIR)/bin/init
+
     # kick off our components at boot time
     mkdir -p $(rootfs_dir $PKGDIR)/etc/systemd/system/vic.target.wants
     cp ${DIR}/bootstrap/tether.service $(rootfs_dir $PKGDIR)/etc/systemd/system/
@@ -108,10 +112,11 @@ if [ -d $(rootfs_dir $PKGDIR)/etc/systemd ]; then
     cp ${DIR}/base/no-dhcp.network $(rootfs_dir $PKGDIR)/etc/systemd/network/
 else
     echo "Preparing systemV init for bootstrap"
+    
     # copy in sysv-init entry script
-    cp ${DIR}/bootstrap/sysvinit $(rootfs_dir $PKGDIR)/bin/sysvinit
-    cp ${REPODIR}/init.sh $(rootfs_dir $PKGDIR)/bin/repoinit
+    cp ${DIR}/bootstrap/sysv-init $(rootfs_dir $PKGDIR)/bin/init
 fi
+cp ${REPODIR}/init.sh $(rootfs_dir $PKGDIR)/bin/repoinit
 
 INIT=$(cat $REPODIR/init.cfg | awk '/^[^#]/{print}')
 generate_iso $PKGDIR $BIN/$ISONAME $INIT

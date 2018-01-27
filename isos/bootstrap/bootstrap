@@ -91,6 +91,8 @@ if mount -t ext4 /dev/disk/by-label/containerfs ${MOUNTPOINT}; then
     iptables -A OUTPUT -o lo -j ACCEPT
     iptables -A FORWARD -i lo -o lo -j ACCEPT
 
+    # block until all disks have presented in by-label - if we switch root before then udevd may be killed before it
+    # processes them all
     until [[ $(ls -1 /dev/disk/by-label | wc -l) -eq $(ls -1 /sys/block | grep -v ram | grep -v loop | wc -l) ]]; do sleep 0.1;done
 
     echo "switching to the new mount"

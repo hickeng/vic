@@ -404,9 +404,9 @@ $(iso-base-custom): isos/base.sh isos/base/repos/$(CUSTOM)/*.repo isos/base/repo
 	#@$(TIME) $< -r $(CUSTOM) -c $(BIN)/.yum-cache.tgz -k $(CUSTOM_RPM) -p $@
 
 # appliance staging - allows for caching of package install
-$(appliance-staging): isos/appliance-staging.sh $(iso-base-photon2)
+$(appliance-staging): isos/appliance-staging.sh $(iso-base-photon1)
 	@echo staging for VCH appliance
-	$(TIME) $< -c $(BIN)/.yum-cache-photon-2.0.tgz -p $(iso-base-photon2) -o $@
+	$(TIME) $< -c $(BIN)/.yum-cache-photon-1.0.tgz -p $(iso-base-photon1) -o $@
 
 # main appliance target - depends on all top level component targets
 $(appliance): isos/appliance.sh isos/appliance/* isos/vicadmin/** $(vicadmin) $(vic-init) $(portlayerapi) $(docker-engine-api) $(appliance-staging) $(archive)
