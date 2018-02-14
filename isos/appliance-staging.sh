@@ -84,7 +84,7 @@ unpack $PACKAGE $PKGDIR
 #   tndf      # so we can deploy other packages into the appliance live - MUST BE REMOVED FOR SHIPPING
 #   vim       # basic editing function
 #   lsof      # for debugging issues unmounting disks for the copy/diff paths
-yum_cached -c $cache -u -p $PKGDIR install \
+package_cached -c $cache -u -p $PKGDIR install \
     haveged \
     systemd \
     openssh \
@@ -112,7 +112,7 @@ echo "vicadmin ALL=NOPASSWD: /sbin/iptables --list" >> $(rootfs_dir $PKGDIR)/etc
 
 # ensure we're not including a cache in the staging bundle
 # but don't update the cache bundle we're using to install
-yum_cached -p $PKGDIR clean all
+package_cached -p $PKGDIR clean all
 
 # configure us for autologin of root
 #COPY override.conf $ROOTFS/etc/systemd/system/getty@.service.d/
@@ -121,8 +121,8 @@ pwhash=$(openssl passwd -1 -salt vic password)
 sed -i -e "s/^root:[^:]*:/root:${pwhash}:/" $(rootfs_dir $PKGDIR)/etc/shadow
 
 # Disable SSH by default - this can be enabled via guest operations
-rm $(rootfs_dir $PKGDIR)/usr/lib/systemd/system/sshd@.service
-rm $(rootfs_dir $PKGDIR)/etc/systemd/system/multi-user.target.wants/sshd.service
+rm -f $(rootfs_dir $PKGDIR)/usr/lib/systemd/system/sshd@.service
+rm -f $(rootfs_dir $PKGDIR)/etc/systemd/system/multi-user.target.wants/sshd.service
 
 # Allow root login via ssh
 sed -i -e "s/\#*PermitRootLogin\s.*/PermitRootLogin yes/" $(rootfs_dir $PKGDIR)/etc/ssh/sshd_config

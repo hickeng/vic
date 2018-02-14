@@ -176,12 +176,12 @@ END {
 
 # Helper to ensure, if possible, that the specified packages are installed
 # ...: space separted list of packages
-ensure_apt_packages() {
+ensure_packages() {
     local install
 
     # ensure we've got the utils we need
     for pkg in "$@"; do
-        dpkg -s $pkg >/dev/null 2>&1 || install="$install $pkg"
+        tdnf list installed $pkg >/dev/null 2>&1 || install="$install $pkg"
     done
 
     if [ -n "$install" ]; then
@@ -193,11 +193,9 @@ ensure_apt_packages() {
 
         # try without update first
         echo "Installing necessary packages: $install"
-        apt-get -y install $install >/dev/null 2>&1 || {
-            (apt-get update && apt-get -y install $install) || {
-                echo "Failed to install $install packages: $?" 1>&2
-                return 1
-            }
+        tdnf -qy --releasever 2.0 install $install >/dev/null 2>&1 || {            
+            echo "Failed to install $install packages: $?" 1>&2
+            return 1
         }
     fi
 }
@@ -212,10 +210,12 @@ generate_iso() {
         return 1
     }
 
-    ensure_apt_packages cpio xorriso || {
-        echo "cpio and xorriso packages must be installed for ISO authoring: $?" 1>&2
+    # for now we do a binary check not a package check because toybox/coreutil collision and no xorriso package
+    # ensure_packages tdnf toybox || {
+    if [ ! -x /usr/bin/cpio -o ! -x /usr/local/bin/xorriso ]; then
+        echo "cpio (or toybox) and xorriso must be installed for ISO authoring: $?" 1>&2
         return 1
-    }
+    fi
 
     out=$(readlink -f $2)
     # subshell to avoid changing directory for invoker in failure cases
@@ -263,12 +263,12 @@ generate_iso() {
 }
 
 
-# Support use of yum cached packages with installroot
+# Support use of cached packages with installroot
 # This has been written to use getopts to:
 # a. allow the cache to be optional
 # b. as a reference for other functions
-yum_cached() {
-    usage() { echo "Usage: yum_cached [-c yum-cache(tgz)] [-u (update cache if present)] -p package-dir <options>" 1>&2; }
+package_cached() {
+    usage() { echo "Usage: package_cached [-c package-cache(tgz)] [-u (update cache if present)] -p package-dir <options>" 1>&2; }
 
     # must ensure OPTIND is local, along with any set by processing
     local OPTIND flag cache update INSTALLROOT cmds
@@ -309,33 +309,27 @@ yum_cached() {
     # bundle specific - if we're cleaning the cache and we want it all gone
     # $1 because of the shift after getopts
     if [ "$1" == "clean" -a "$2" == "all" ]; then
-        rm -fr ${INSTALLROOT}/var/cache/yum/*
+        rm -fr ${INSTALLROOT}/var/cache/tdnf/*
     else
-        # do this before we bother unpacking the cache
-        ensure_apt_packages yum || {
-            echo "cpio and xorriso packages must be installed for ISO authoring: $?" 1>&2
-            return 2
-        }
-
         # unpack cache
         if [ -n "${cache}" -a -e "${cache}" ]; then
-            echo "Unpacking yum cache into ${INSTALLROOT}"
+            echo "Unpacking package cache into ${INSTALLROOT}"
 
             tar -C ${INSTALLROOT} -zxf $cache || {
-                echo "Unpacking yum cache $cache failed: $?" 1>&2
+                echo "Unpacking package cache $cache failed: $?" 1>&2
                 return 3
             }
         fi
 
-        /usr/bin/yum --installroot $INSTALLROOT $ACTION $cmds || {
-            echo "Error while running yum command \"$cmds\": $?" 1>&2
+        /usr/bin/tdnf --releasever 2.0 --installroot $INSTALLROOT $ACTION $cmds || {
+            echo "Error while running package manager command \"$cmds\": $?" 1>&2
             return 4
         }
     fi
 
     # repack cache
-    if [ -n "$update" -a -n "${cache}" -a -d ${INSTALLROOT}/var/cache/yum ]; then
-        tar -C ${INSTALLROOT} -zcf $cache var/cache/yum
+    if [ -n "$update" -a -n "${cache}" -a -d ${INSTALLROOT}/var/cache/tdnf ]; then
+        tar -C ${INSTALLROOT} -zcf $cache var/cache/tdnf
     fi
 }
 

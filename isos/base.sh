@@ -54,7 +54,7 @@ if [ ! -z "$*" -o -z "$PACKAGE" ]; then
 fi
 
 # prep the build system
-ensure_apt_packages cpio rpm tar ca-certificates xz-utils
+ensure_packages rpm tar ca-certificates xz
 
 PKGDIR=$(mktemp -d)
 
@@ -62,17 +62,19 @@ PKGDIR=$(mktemp -d)
 initialize_bundle $PKGDIR
 
 # base filesystem setup
-mkdir -p $(rootfs_dir $PKGDIR)/{etc/yum,etc/yum.repos.d}
+mkdir -p $(rootfs_dir $PKGDIR)/{etc/tdnf,etc/yum.repos.d}
 ln -s /lib $(rootfs_dir $PKGDIR)/lib64
 if [[ $DRONE_BUILD_NUMBER && $DRONE_BUILD_NUMBER > 0 ]]; then
     cp $DIR/base/*-local.repo $(rootfs_dir $PKGDIR)/etc/yum.repos.d/
 else
     cp $DIR/base/*-remote.repo $(rootfs_dir $PKGDIR)/etc/yum.repos.d/
 fi
-cp $DIR/base/yum.conf $(rootfs_dir $PKGDIR)/etc/yum/
+cp $DIR/base/tdnf.conf $(rootfs_dir $PKGDIR)/etc/tdnf/
 
 # install the core packages
-yum_cached -c $cache -u -p $PKGDIR install filesystem coreutils linux-esx --nogpgcheck -y
+# TODO: ideally kmod wouldn't be installed into the base image but run from outside unless we have a solid reason for having
+#       that tool in the endpointVM. 
+package_cached -c $cache -u -p $PKGDIR install filesystem coreutils linux-esx kmod --nogpgcheck -y
 
 
 # Issue 3858: find all kernel modules and unpack them and run depmod against that directory
@@ -81,7 +83,7 @@ KERNEL_VERSION=$(basename $(rootfs_dir $PKGDIR)/lib/modules/*)
 chroot $(rootfs_dir $PKGDIR) depmod $KERNEL_VERSION
 
 # strip the cache from the resulting image
-yum_cached -c $cache -p $PKGDIR clean all
+package_cached -c $cache -p $PKGDIR clean all
 
 # move kernel into bootfs /boot directory so that syslinux could load it
 mv $(rootfs_dir $PKGDIR)/boot/vmlinuz-* $(bootfs_dir $PKGDIR)/boot/vmlinuz64

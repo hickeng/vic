@@ -16,7 +16,7 @@ SHELL=/bin/bash
 
 GO ?= go
 GOVERSION ?= go1.8
-OS := $(shell uname | tr '[:upper:]' '[:lower:]')
+OS := $(shell uname | awk '{print tolower($$0)}')
 ifeq (vagrant, $(filter vagrant,$(USER) $(SUDO_USER)))
 	# assuming we are in a shared directory where host arch is different from the guest
 	BIN_ARCH := -$(OS)

@@ -83,7 +83,7 @@ if [ -v debug ]; then
     # packages list here
     #   tndf      # allows package install during debugging.
     #   vim       # basic editing function for debugging.
-    yum_cached -c $cache -u -p $PKGDIR install \
+    package_cached -c $cache -u -p $PKGDIR install \
         bash \
         shadow \
         tdnf \
@@ -101,7 +101,7 @@ fi
 #   iproute2  # for ip
 #   libtirpc  # due to a previous package reliance on rpc
 #
-yum_cached -c $cache -u -p $PKGDIR install \
+package_cached -c $cache -u -p $PKGDIR install \
     haveged \
     systemd \
     iptables \
@@ -112,7 +112,7 @@ touch $(rootfs_dir $PKGDIR)/etc/initrd-release
 
 # ensure we're not including a cache in the staging bundle
 # but don't update the cache bundle we're using to install
-yum_cached -p $PKGDIR clean all
+package_cached -p $PKGDIR clean all
 
 # package up the result
 pack $PKGDIR $OUT
