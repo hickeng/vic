@@ -296,20 +296,41 @@ func toolboxOverrideArchiveRead(system System, u *url.URL, tr *tar.Reader) error
 			return err
 		}
 
-		diskPath, err := mountDiskLabel(op, system, diskLabel)
+    diskPath, err := mountDiskLabel(op, system, diskLabel)
 		if err != nil {
 			op.Errorf(err.Error())
 			return err
 		}
+
 		defer unmount(op, diskPath)
 
 		// no need to join on u.Path here. u.Path == spec.Rebase, but
 		// Unpack will rebase tar headers for us. :thumbsup:
-		err = archive.InvokeUnpack(op, tr, spec, diskPath)
+
+		op.Debugf("Unpacking tar archive to %s", diskPath)
+		d := &archive.DoneChannel{}
+		d.Done = make(chan error)
+		waitChan, err := baseOp.LaunchUtility(func() (*os.Process, error) {
+			op.Debugf("XXX launching tar unpack binary")
+			cmd, err := d.Unpack(op, tr, spec, diskPath, "/.tether/unpack")
+			return cmd.Process, err
+		})
+
 		if err != nil {
-			op.Errorf(err.Error())
+			op.Errorf("XXX %s", err)
+			return err
 		}
-		op.Debugf("Finished reading from tar archive to path %s: %s", u.Path, u.String())
+
+		if err = <-d.Done; err != nil {
+			op.Errorf("XXX %s", err)
+			return err
+		}
+
+		op.Debugf("XXX wait for pid")
+		rc := <-waitChan
+		op.Debugf("XXX %d", rc)
+
+		op.Debugf("XXX Finished reading from tar archive to path %s: %s", u.Path, u.String())
 		return err
 	}
 	return defaultArchiveHandler.Read(u, tr)
