@@ -23,7 +23,7 @@ function usage() {
     echo "Usage: $0 -h vch-address [-a/-d] -p password [attach/detach] target" >&2
     echo "Valid targets are: "
     echo "    vic-init"
-    echo "    vic-admin"
+    echo "    vicadmin"
     echo "    docker-engine"
     echo "    port-layer"
     echo "    vic-machine"
@@ -78,7 +78,7 @@ case ${TARGET} in
         PORT=2345
         ;;
 
-    vic-admin)
+    vicadmin)
         PORT=2346
         ;;
 

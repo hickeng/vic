@@ -103,7 +103,7 @@ TEMPFILE=$(mktemp)
 cat > ${TEMPFILE} <<EOF
 #/bin/bash
 if [ \$# != 2 ]; then
-    echo "\$0 vic-init|vic-admin|docker-engine|port-layer|vic-machine port"
+    echo "\$0 vic-init|vicadmin|docker-engine|port-layer|vic-machine port"
     exit 1
 fi
 
@@ -111,7 +111,7 @@ NAME=\$1
 PORT=\$2
 
 if [ -z "\${NAME}" -o -z "\${PORT}" ]; then
-    echo "\$0 vic-init|vic-admin|docker-engine|port-layer|vic-machine port"
+    echo "\$0 vic-init|vicadmin|docker-engine|port-layer|vic-machine port"
     exit 1
 fi
 
