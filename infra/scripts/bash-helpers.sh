@@ -106,22 +106,57 @@ vic-ls () {
     "$(vic-path)"/bin/vic-machine-"$OS" ls --target="$TARGET_URL" --thumbprint="$THUMBPRINT" "$@"
 }
 
-vic-ssh () {
+vic-enable-ssh () {
     vicProfileTranscode
 
-    unset keyarg
+    sshCmdOpts=" -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "
     if [ -e "$HOME"/.ssh/authorized_keys ]; then
-        keyarg="--authorized-key=$HOME/.ssh/authorized_keys"
+        echo "Configuring ssh access via user root and authorized_keys from $HOME/.ssh/"
+        local sshauth="--authorized-key=$HOME/.ssh/authorized_keys"
+        sshCmdWrapper=""
+        sshCmdOpts+=" -o PreferredAuthentications=publickey -o PubkeyAuthentication=yes -o PasswordAuthentication=no -o ChallengeResponseAuthentication=no "
+    elif sshpass -v; then
+        echo "Configuring ssh access via user:root, password:password"
+        local sshauth="--rootpw=password"
+        sshCmdWrapper="sshpass -ppassword"
+        sshCmdOpts+=" -o PreferredAuthentications=password,keyboard-interactive -o PubkeyAuthentication=no -o PasswordAuthentication=yes -o ChallengeResponseAuthentication=yes "
+    else
+        echo "Install sshpass to automate interactive authentication"
+        echo "Use 'ssh-keygen -b 1024 -t rsa -f \$HOME/.ssh/id_rsa -q -N "" && cat \$HOME/.ssh/id_rsa.pub >> \$HOME/.ssh/authorized_keys' to generate a key for non-interactive use"
+        # continue anyway to actually enable ssh for non-scripted use
     fi
 
     # cannot execute in subshell as we want access to the environment variables that result
     pushd "$(vic-path)"/bin >/dev/null
-    out=$("$(vic-path)"/bin/vic-machine-"$OS" debug --target="$TARGET_URL" --compute-resource="$COMPUTE" --name="${VIC_NAME:-${USER}test}" --enable-ssh $keyarg --rootpw=password --thumbprint="$THUMBPRINT")
+    out=$("$(vic-path)"/bin/vic-machine-"$OS" debug --target="$TARGET_URL" --compute-resource="$COMPUTE" --name="${VIC_NAME:-${USER}test}" --enable-ssh ${sshauth} --thumbprint="$THUMBPRINT")
     host=$(echo "$out" | grep DOCKER_HOST | awk -F"DOCKER_HOST=" '{print $2}' | cut -d ":" -f1 | cut -d "=" -f2)
     popd >/dev/null
+}
+
+vic-ssh () {
+    vic-enable-ssh
 
     echo "SSH to ${host}"
-    sshpass -ppassword ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@"${host}" "$@"
+    ${sshCmdWrapper} ssh ${sshCmdOpts} root@"${host}" "$@"
+}
+
+vic-scp-to () {
+    local arr=("$@")
+
+    if [ "${#arr[@]}" -le "1" ]; then
+        echo "Usage: ${FUNCNAME[1]} src [src...] dest"
+        return 1
+    fi
+
+    vic-enable-ssh
+
+    # get the last element as the target path
+    target="${arr[-1]}"
+    # all previous elements are the sources
+    src=("${arr[@]::${#arr[@]}-1}")
+
+    echo "Scp to ${host}"
+    ${sshCmdWrapper} scp ${sshCmdOpts} "${src[@]}" root@"${host}":${target}
 }
 
 vic-admin () {

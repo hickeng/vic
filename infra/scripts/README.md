@@ -152,15 +152,50 @@ INFO[0000] Validating target
 ...
 ```
 
+### Enable SSH
+
+Enables ssh on the endpointVM via vic-machine debug. If an `$HOME/.ssh/authorized_keys` file exists then that is used, otherwise a password of `password` is configured. After running this function three environment variables will be set:
+
+1. `sshCmdOpts` - ssh authentication options along with some known key configuration
+2. `sshCmdWrapper` - will be empty or set to `sshpass` with options depending on the authorization type detected
+3. `host` - the hostname or IP address of the VCH appliance to ssh to
+
+```console
+$ vic-enable-ssh
+Configuring ssh access via user:root, password:password
+$ echo $sshCmdOpts
+-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o PreferredAuthentications=password,keyboard-interactive -o PubkeyAuthentication=no -o PasswordAuthentication=yes -o ChallengeResponseAuthentication=yes
+```
+or
+```console
+vic-enable-ssh
+Configuring ssh access via user root and authorized_keys from ~/.ssh/
+$ echo $sshCmdOpts
+-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -o PubkeyAuthentication=yes -o PasswordAuthentication=no -o ChallengeResponseAuthentication=no
+```
+
 ### SSH into a VCH
 
 Enables ssh on the endpointVM via vic-machine debug, configures the endpoint for ssh, extracts the IP address and ssh's into the endpoint. You are left with an interactive shell.
+Configures the endpointVM for ssh vic vic-enable-ssh and establishes an interactive shell
 ```console
 $ vic-ssh
-SSH to 192.168.78.127
-Warning: Permanently added '192.168.78.127' (ECDSA) to the list of known hosts.
+Configuring ssh access via user:root, password:password
+SSH to vic-st-h2-179.eng.vmware.com
+Warning: Permanently added 'vic-st-h2-179.eng.vmware.com,10.197.37.179' (ECDSA) to the list of known hosts.
 Warning: your password will expire in 0 days
+Last login: Fri Mar 16 01:51:35 2018 from 10.118.67.116
 root@ [ ~ ]#
+```
+
+### SCP files to a VCH
+
+Configures the endpointVM for ssh vic vic-enable-ssh and scps one or more source arguments to the final destination argument (must be a directory if multiple sources)
+```console
+$ vic-scp-to vpxd.log README.md /tmp/
+Configuring ssh access via user:root, password:password
+Scp to vic-st-h2-179.eng.vmware.com
+Warning: Permanently added 'vic-st-h2-179.eng.vmware.com,10.197.37.179' (ECDSA) to the list of known hosts.
 ```
 
 ### Repo Path
