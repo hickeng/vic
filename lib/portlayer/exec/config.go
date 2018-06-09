@@ -22,6 +22,7 @@ import (
 	"github.com/vmware/vic/lib/config"
 	"github.com/vmware/vic/lib/config/executor"
 	"github.com/vmware/vic/lib/portlayer/event"
+	"github.com/vmware/vic/pkg/batcher"
 	"github.com/vmware/vic/pkg/trace"
 )
 
@@ -65,4 +66,7 @@ type Configuration struct {
 
 	// addToVMGroup sends signal for batching dispatcher to add container VM to VMGroup
 	addToVMGroup func(trace.Operation) error
+
+	// allows batching of reconfigure operations against a given VM
+	reconfigBatcher batcher.Batcher
 }

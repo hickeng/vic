@@ -18,12 +18,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/vmware/vic/pkg/vsphere/extraconfig/vmomi"
 
 	"github.com/vmware/govmomi/vim25/types"
 	"github.com/vmware/vic/lib/portlayer/event/events"
+	"github.com/vmware/vic/pkg/batcher"
 	"github.com/vmware/vic/pkg/retry"
 	"github.com/vmware/vic/pkg/trace"
+	"github.com/vmware/vic/pkg/vsphere/extraconfig"
 	"github.com/vmware/vic/pkg/vsphere/session"
 	"github.com/vmware/vic/pkg/vsphere/tasks"
 	"github.com/vmware/vic/pkg/vsphere/vm"
@@ -155,9 +160,10 @@ func Commit(op trace.Operation, sess *session.Session, h *Handle, waitTime *int3
 				return ConcurrentAccessError{errors.New(detail)}
 			}
 
-			_, err := h.vm.WaitForResult(op, func(op context.Context) (tasks.Task, error) {
-				return h.vm.Reconfigure(op, *s)
-			})
+			err := queueReconfigure(op, h.ExecConfig.ID, h)
+			// _, err := h.vm.WaitForResult(op, func(op context.Context) (tasks.Task, error) {
+			// 	return h.vm.Reconfigure(op, *s)
+			// })
 			if err != nil {
 				op.Errorf("Reconfigure: failed update to %s with change version %s: %+v", h.ExecConfig.ID, s.ChangeVersion, err)
 
@@ -214,6 +220,121 @@ func Commit(op trace.Operation, sess *session.Session, h *Handle, waitTime *int3
 	}
 
 	return nil
+}
+
+func queueReconfigure(op trace.Operation, id string, handle *Handle) error {
+	op.Debugf("Queued reconfigure operation for %s: %p", id, handle)
+	ret := Config.reconfigBatcher.QueueSync(op, id, 0, handle)
+	op.Debugf("Result for queued reconfigure: %v", ret)
+	if ret == nil {
+		return nil
+	}
+
+	return ret.(error)
+}
+
+func admitReconfigure(ctx context.Context, groupID string, candidate interface{}, configs []interface{}, state interface{}) (batcher.Assessment, interface{}) {
+	var spec *types.VirtualMachineConfigSpec
+	handle := candidate.(*Handle)
+
+	op := trace.FromContext(ctx, "assess reconfigure for batching")
+	if len(configs) == 0 {
+		op.Debugf("Initializing reconfigure batch %s", groupID)
+		return batcher.Accept, handle.Spec.Spec()
+	}
+
+	// TODO: I'd rather this not mutate the actual spec for the initial handle
+	spec = state.(*types.VirtualMachineConfigSpec)
+
+	current := vmomi.OptionValueMap(spec.ExtraConfig)
+	changes := vmomi.OptionValueMap(handle.changes)
+
+	if !handle.Batch {
+		updates := vmomi.OptionValueUpdatesFromMap(spec.ExtraConfig, changes)
+		op.Debugf("extraconfig updates: %s", vmomi.OptionValueArrayToString(updates))
+		return batcher.RejectWaitComplete, ConcurrentAccessError{fmt.Errorf("%s cannot be batched", handle.key)}
+	}
+
+	candidateVer := handle.Spec.ChangeVersion
+	if spec.ChangeVersion != "" && candidateVer != "" && candidateVer != spec.ChangeVersion {
+		return batcher.RejectWaitComplete, ConcurrentAccessError{fmt.Errorf("change version %s does not match batch version %s", candidateVer, spec.ChangeVersion)}
+	}
+
+	if spec.ChangeVersion == "" {
+		spec.ChangeVersion = candidateVer
+	}
+
+	for k, v := range current {
+		value, present := changes[k]
+		if !present {
+			continue
+		}
+		if v == value {
+			// drop it from one set to avoid dups
+			delete(changes, k)
+			continue
+		}
+
+		// TODO: fix this horrific hack for merging a specific map key index
+		if k != "guestinfo.vice./execs@non-persistent" {
+			return batcher.RejectWaitComplete, ConcurrentAccessError{fmt.Errorf("conflict on key %s for batched changes", k)}
+		}
+
+		// TODO: can we make use of vmomi.OptionValueUpdatesFromMap(h.Config.ExtraConfig, cfg) instead of hand cranking this
+		// if we do we would need to change the way it records keys that are missing from the new map as they are currently nil
+		// values and would overwrite important data.
+		set := make(map[string]bool)
+		keys := strings.Split(v, extraconfig.Separator)
+		for _, s := range keys {
+			set[s] = true
+		}
+
+		keys2 := strings.Split(value, extraconfig.Separator)
+		for _, s := range keys2 {
+			if _, exists := set[s]; !exists {
+				keys = append(keys, s)
+			}
+		}
+
+		delete(changes, k)
+		current[k] = strings.Join(keys, extraconfig.Separator)
+	}
+
+	// no conflicts, so combine them
+	updatedChanges := vmomi.OptionValueFromMap(changes, true)
+	updatedCurrent := vmomi.OptionValueFromMap(current, true)
+	spec.ExtraConfig = append(updatedCurrent, updatedChanges...)
+
+	// TODO: determine if device change list doesn't conflict and dedup
+	spec.DeviceChange = append(spec.DeviceChange, handle.Spec.DeviceChange...)
+
+	return batcher.Accept, spec
+}
+
+func disptachReconfigure(groupID string, data []interface{}, state interface{}, ctxs batcher.Contexts) interface{} {
+	var spec *types.VirtualMachineConfigSpec
+	handle := data[0].(*Handle)
+	op := trace.FromContext(ctxs(data[0]), "batched reconfigure (primary)")
+
+	// Have to add deep knowledge of how we're using extraconfig here, which is not what I prefer. I'd prefer it enough data was in the handle
+	// to express the diff of the changes, e.g. +id to array, rather than just the modified array. As it stands we kind of have to make assumptions.
+	if state != nil {
+		op.Debugf("Batch %s is using processed state from admission assessment", groupID)
+		spec = state.(*types.VirtualMachineConfigSpec)
+	} else {
+		spec = handle.Spec.Spec()
+	}
+
+	for i := 1; i < len(data); i++ {
+		op2 := trace.FromContext(ctxs(data[i]), "batched reconfigure (%i)", i)
+		op2.Debugf("Dispatching operation for %s as part of batch (%d batched)", groupID, len(data))
+	}
+
+	_, err := handle.vm.WaitForResult(op, func(ctx context.Context) (tasks.Task, error) {
+		return handle.vm.Reconfigure(ctx, *spec)
+	})
+
+	return err
 }
 
 // batchBlockOnFunc is a batching routine that batch processes incoming requests.

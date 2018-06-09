@@ -58,6 +58,7 @@ func Join(op *trace.Operation, h interface{}, task *executor.SessionConfig) (int
 	}
 
 	op.Debugf("Adding task (%s): %s", task.Cmd.Path, task.ID)
+	handle.Batch = true
 
 	tasks[task.ID] = task
 

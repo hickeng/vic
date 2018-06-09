@@ -30,6 +30,7 @@ import (
 	"github.com/vmware/vic/lib/portlayer/event"
 	"github.com/vmware/vic/lib/portlayer/event/collector/vsphere"
 	"github.com/vmware/vic/lib/portlayer/event/events"
+	"github.com/vmware/vic/pkg/batcher"
 	"github.com/vmware/vic/pkg/trace"
 	"github.com/vmware/vic/pkg/vsphere/compute"
 	"github.com/vmware/vic/pkg/vsphere/extraconfig"
@@ -174,6 +175,9 @@ func Init(ctx context.Context, sess *session.Session, source extraconfig.DataSou
 				return nil
 			}
 		}
+
+		Config.reconfigBatcher = batcher.NewBatcher(ctx, admitReconfigure, disptachReconfigure, true)
+		Config.reconfigBatcher.Start(context.TODO())
 	})
 
 	return initializer.err

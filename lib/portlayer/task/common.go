@@ -63,6 +63,7 @@ func toggleActive(op *trace.Operation, h interface{}, id string, active bool) (i
 	op.Debugf("Toggling active state of task %s (%s): %t", id, task.Cmd.Path, active)
 	task.Active = active
 	handle.Reload()
+	handle.Batch = true
 
 	return handle, nil
 }

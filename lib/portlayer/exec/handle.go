@@ -83,6 +83,9 @@ type Handle struct {
 	// should this change trigger a reload in the target container
 	reload bool
 
+	// whether this handle is a candidate for batched dispatch
+	Batch bool
+
 	// allow for passing outside of the process
 	key string
 }
