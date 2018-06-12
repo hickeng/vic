@@ -83,18 +83,18 @@ type SessionConfig struct {
 
 	// The primary session may have the same ID as the executor owning it
 	executor.Common `vic:"0.1" scope:"read-only" key:"common"`
-	executor.Detail `vic:"0.1" scope:"read-write" key:"detail"`
+	Detail          `vic:"0.1" scope:"read-write" key:"detail"`
 
 	// Diagnostics holds basic diagnostics data
-	Diagnostics executor.Diagnostics `vic:"0.1" scope:"read-write" key:"diagnostics"`
+	Diagnostics executor.Diagnostics `vic:"0.1" scope:"read-write" key:"diagnostics" recurse:"skip-decode"`
 
 	// The primary process for the session
 	Cmd exec.Cmd `vic:"0.1" scope:"read-only" key:"cmd" recurse:"depth=2,nofollow"`
 
 	// The exit status of the process, if any
-	ExitStatus int `vic:"0.1" scope:"read-write" key:"status"`
+	ExitStatus int `vic:"0.1" scope:"read-write" key:"status" recurse:"skip-decode"`
 
-	Started string `vic:"0.1" scope:"read-write" key:"started"`
+	Started string `vic:"0.1" scope:"read-write" key:"started" recurse:"skip-decode"`
 
 	// Allow attach
 	Attach bool `vic:"0.1" scope:"read-only" key:"attach"`
@@ -158,6 +158,8 @@ type NetworkEndpoint struct {
 	IP *net.IPNet `vic:"0.1" scope:"read-only" key:"ip"`
 
 	// Actual IP address assigned
+	// TODO: should this skip decode - if it's used to seed DHCP requests for semi-stable addressing then
+	// we may need actual "decode-once-only" which is a much more involved tag vs recurse:"skip-decode"
 	Assigned net.IPNet `vic:"0.1" scope:"read-write" key:"assigned"`
 
 	// The network in which this information should be interpreted. This is embedded directly rather than
@@ -174,6 +176,13 @@ type NetworkEndpoint struct {
 
 	// whether the network config was successfully applied
 	configured bool `vic:"0.1" scope:"read-only" recurse:"depth=0"`
+}
+
+type Detail struct {
+	// creation, started & stopped timestamps
+	CreateTime int64 `vic:"0.1" scope:"read-write" key:"createtime"`
+	StartTime  int64 `vic:"0.1" scope:"read-write" key:"starttime" recurse:"skip-decode"`
+	StopTime   int64 `vic:"0.1" scope:"read-write" key:"stoptime" recurse:"skip-decode"`
 }
 
 func (e *NetworkEndpoint) IsDynamic() bool {

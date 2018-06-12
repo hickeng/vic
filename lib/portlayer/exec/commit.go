@@ -429,13 +429,13 @@ func reloadConfig(op trace.Operation, h *Handle, c *Container) error {
 			err := c.ReloadConfig(op)
 
 			if err != nil {
-				op.Debugf("Error occurred during an attempt to reload the container config for an exec operation: (%s)", err)
+				op.Debugf("Error occurred during an attempt to reload the container config for an exec operation: (%#v)", err)
 
 				// we will request the powerstate directly(this could be very costly without the vmomi gateway)
 				state, err := c.vm.PowerState(op)
 				if err != nil && state == types.VirtualMachinePowerStatePoweredOff {
 					// TODO: probably should make this error a specific type such as PowerOffDuringExecError( or a better name ofcourse)
-					return fmt.Errorf("container(%s) was powered down during the requested operation.", h.ExecConfig.ID)
+					return fmt.Errorf("%s powered off during reload", h.ExecConfig.ID)
 				}
 				return err
 			}

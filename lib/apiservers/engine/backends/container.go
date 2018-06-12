@@ -447,7 +447,7 @@ func (c *ContainerBackend) taskStartHelper(op trace.Operation, id, eid, name str
 // taskStateWaitHelper is used to wait until the specified task reaches a target state or falls out of the set of permitted wait states.
 // The state sets are specified as maps, but only the keys are used, the value portion is ignored
 func (c *ContainerBackend) taskStateWaitHelper(op trace.Operation, id, eid, name string, targetStates, waitStates map[string]bool) (*models.TaskInspectResponse, error) {
-	defer trace.End(trace.Begin(fmt.Sprintf("%s.%s", eid, id), op))
+	defer trace.End(trace.Begin(fmt.Sprintf("%s.%s", id, eid), op))
 
 	for op.Err() == nil {
 		handle, err := c.Handle(id, name)
@@ -462,7 +462,7 @@ func (c *ContainerBackend) taskStateWaitHelper(op trace.Operation, id, eid, name
 
 		// success condition
 		if _, success := targetStates[ec.State]; success {
-			op.Debug("Target state reached")
+			op.Debugf("Target state %s reached", ec.State)
 			return ec, nil
 		}
 
@@ -477,7 +477,7 @@ func (c *ContainerBackend) taskStateWaitHelper(op trace.Operation, id, eid, name
 			return ec, fmt.Errorf("state: %s", ec.State)
 		}
 
-		op.Debug("Waiting for state change")
+		op.Debugf("Waiting for state change from %s", ec.State)
 		err = c.containerProxy.WaitTask(op, handle, name, eid)
 		if err != nil {
 			return ec, err
@@ -517,7 +517,7 @@ func (c *ContainerBackend) ContainerExecStart(ctx context.Context, eid string, s
 	id := vc.ContainerID
 	name := vc.Name
 
-	op.Debugf("Exec start of %s.%s", eid, id)
+	op.Debugf("Exec start of %s.%s", id, eid)
 
 	var ec *models.TaskInspectResponse
 	operation := func() error {
@@ -591,7 +591,7 @@ func (c *ContainerBackend) ContainerExecStart(ctx context.Context, eid string, s
 		}
 	}
 
-	op.Infof("Exec %s in %s launched successfully", id, eid)
+	op.Infof("Exec %s.%s launched successfully", id, eid)
 
 	// no need to attach for detached case
 	if !attach {

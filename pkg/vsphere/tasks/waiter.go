@@ -278,6 +278,41 @@ func IsNotFoundError(err error) bool {
 	return false
 }
 
+// IsInvalidPowerStateError is an error certifier function for errors coming back from vsphere. It checks for an InvalidPowerStateFault
+func IsInvalidPowerStateError(err error) bool {
+	if soap.IsVimFault(err) {
+		_, ok1 := soap.ToVimFault(err).(*types.InvalidPowerState)
+		_, ok2 := soap.ToVimFault(err).(*types.InvalidPowerStateFault)
+		return ok1 || ok2
+	}
+
+	if soap.IsSoapFault(err) {
+		_, ok1 := soap.ToSoapFault(err).VimFault().(types.InvalidPowerState)
+		_, ok2 := soap.ToSoapFault(err).VimFault().(types.InvalidPowerStateFault)
+		// sometimes we get the correct fault but wrong type
+		return ok1 || ok2 || soap.ToSoapFault(err).String == "vim.fault.InvalidPowerState" ||
+			soap.ToSoapFault(err).String == "vim.fault.InvalidPowerState"
+	}
+	return false
+}
+
+// IsInvalidStateError is an error certifier function for errors coming back from vsphere. It checks for an InvalidStateFault
+func IsInvalidStateError(err error) bool {
+	if soap.IsVimFault(err) {
+		_, ok1 := soap.ToVimFault(err).(*types.InvalidState)
+		return ok1
+	}
+
+	if soap.IsSoapFault(err) {
+		_, ok1 := soap.ToSoapFault(err).VimFault().(types.InvalidState)
+		_, ok2 := soap.ToSoapFault(err).VimFault().(types.InvalidStateFault)
+		// sometimes we get the correct fault but wrong type
+		return ok1 || ok2 || soap.ToSoapFault(err).String == "vim.fault.InvalidState" ||
+			soap.ToSoapFault(err).String == "vim.fault.InvalidState"
+	}
+	return false
+}
+
 // Helper Functions
 func logFault(op trace.Operation, fault types.BaseMethodFault) {
 	op.Errorf("unexpected fault on task retry: %#v", fault)

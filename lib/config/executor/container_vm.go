@@ -91,10 +91,10 @@ type Diagnostics struct {
 
 	// RessurectionCount is a log of how many times the entity has been restarted due
 	// to error exit
-	ResurrectionCount int `vic:"0.1" scope:"read-write" key:"resurrections" recurse:"skip-decode"`
+	ResurrectionCount int `vic:"0.1" scope:"read-write" key:"resurrections"`
 	// ExitLogs is a best effort record of the time of process death and the cause for
 	// restartable entities
-	ExitLogs []ExitLog `vic:"0.1" scope:"read-write" key:"exitlogs" recurse:"skip-decode"`
+	ExitLogs []ExitLog `vic:"0.1" scope:"read-write" key:"exitlogs"`
 
 	// SyslogConfig holds configuration for connecting to a syslog
 	// server
@@ -244,7 +244,7 @@ type SessionConfig struct {
 	OpenStdin bool `vic:"0.1" scope:"read-only" key:"openstdin"`
 
 	// Delay launching the Cmd until an attach request comes
-	RunBlock bool `vic:"0.1" scope:"read-write" key:"runblock" recurse:"skip-decode"`
+	RunBlock bool `vic:"0.1" scope:"read-write" key:"runblock"`
 
 	// Should this config be activated or not
 	Active bool `vic:"0.1" scope:"read-only" key:"active"`
@@ -252,9 +252,9 @@ type SessionConfig struct {
 	// Allocate a tty or not
 	Tty bool `vic:"0.1" scope:"read-only" key:"tty"`
 
-	ExitStatus int `vic:"0.1" scope:"read-write" key:"status" recurse:"skip-decode"`
+	ExitStatus int `vic:"0.1" scope:"read-write" key:"status"`
 
-	Started string `vic:"0.1" scope:"read-write" key:"started" recurse:"skip-decode"`
+	Started string `vic:"0.1" scope:"read-write" key:"started"`
 
 	Restart bool `vic:"0.1" scope:"read-only" key:"restart"`
 
@@ -287,8 +287,8 @@ type Detail struct {
 
 	// creation, started & stopped timestamps
 	CreateTime int64 `vic:"0.1" scope:"read-write" key:"createtime"`
-	StartTime  int64 `vic:"0.1" scope:"read-write" key:"starttime" recurse:"skip-decode"`
-	StopTime   int64 `vic:"0.1" scope:"read-write" key:"stoptime" recurse:"skip-decode"`
+	StartTime  int64 `vic:"0.1" scope:"read-write" key:"starttime"`
+	StopTime   int64 `vic:"0.1" scope:"read-write" key:"stoptime"`
 }
 
 func (t TrustLevel) String() string {
