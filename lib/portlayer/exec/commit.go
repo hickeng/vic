@@ -168,14 +168,15 @@ func Commit(op trace.Operation, sess *session.Session, h *Handle, waitTime *int3
 				op.Errorf("Reconfigure: failed update to %s with change version %s: %+v", h.ExecConfig.ID, s.ChangeVersion, err)
 
 				// Check whether we get ConcurrentAccess and wrap it if needed
-				if f, ok := err.(types.HasFault); ok {
-					switch f.Fault().(type) {
-					case *types.ConcurrentAccess:
-						op.Errorf("Reconfigure: failed update to %s due to ConcurrentAccess, our change version %s", h.ExecConfig.ID, s.ChangeVersion)
-
-						return ConcurrentAccessError{err}
-					}
+				// If it's an invalid state error it may be because there's an in-flight guest operation which doesn't populate detail in the returned fault
+				// If invalid we translate it to concurrent access on the understanding that if it's NOT a transient fault then we will get InvalidStateError
+				// again from calls other than commit. This assumption is viable because an operation that fails commit with concurrent access error
+				// should either be abandoned or replayed from the beginning which, at a minimum, involves getting a new handle.
+				if tasks.IsConcurrentAccessError(err) || tasks.IsInvalidStateError(err) {
+					op.Errorf("Reconfigure: failed update to %s due to ConcurrentAccess, our change version %s", h.ExecConfig.ID, s.ChangeVersion)
+					return ConcurrentAccessError{err}
 				}
+
 				return err
 			}
 

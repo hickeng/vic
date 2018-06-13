@@ -1,4 +1,4 @@
-// Copyright 2016-2017 VMware, Inc. All Rights Reserved.
+// Copyright 2016-2018 VMware, Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -205,6 +205,9 @@ func (c *ContainerBackend) ContainerExecCreate(name string, config *types.ExecCo
 
 	var eid string
 	operation := func() error {
+		if vc.TryLock(APITimeout) {
+			defer vc.Unlock()
+		}
 
 		handle, err := c.Handle(id, name)
 		if err != nil {
@@ -519,6 +522,10 @@ func (c *ContainerBackend) ContainerExecStart(ctx context.Context, eid string, s
 
 	var ec *models.TaskInspectResponse
 	operation := func() error {
+		if vc.TryLock(APITimeout) {
+			defer vc.Unlock()
+		}
+
 		var err error
 		ec, err = c.taskStartHelper(op, id, eid, name)
 		return err
